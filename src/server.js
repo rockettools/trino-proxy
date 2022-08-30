@@ -3,13 +3,16 @@ const express = require("express");
 const axios = require("axios").default;
 const uuidv4 = require("uuid").v4;
 
-const { REDIS_URL } = process.env;
-if (!REDIS_URL) {
-  throw new Error("REDIS_URL not set");
-}
+const logger = require("./lib/logger");
+
+const { LISTEN_PORT = 8080, PRESTO_HOST, REDIS_URL } = process.env;
+if (!PRESTO_HOST) throw new Error("PRESTO_HOST not set");
+if (!REDIS_URL) throw new Error("REDIS_URL not set");
 
 const client = createClient({ url: REDIS_URL });
-client.on("error", (err) => console.log("Redis Client Error", err));
+client.on("error", (err) =>
+  logger.error("Redis client error", { err, url: REDIS_URL })
+);
 
 const app = express();
 const port = 8080;
@@ -32,8 +35,7 @@ function updateUrls(body, newQueryId) {
 }
 
 app.post("/v1/statement", async (req, res) => {
-  console.log(req.headers);
-  console.log(req.body);
+  logger.debug("Statement request", { req });
 
   axios({
     url: presto_url + "/v1/statement",
@@ -49,19 +51,12 @@ app.post("/v1/statement", async (req, res) => {
       // NX: true
     });
 
-    //console.log(response.data);
-    // process.exit(1)
-
     res.json(response.data);
   });
 });
 
 app.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
-  // console.log("Trouble");
   const newQueryId = await client.get(req.params.queryId);
-  console.log("1Trouble", req.params.queryId);
-
-  console.log("2Trouble", newQueryId);
   if (!newQueryId) process.exit(1);
   axios({
     url:
@@ -83,9 +78,6 @@ app.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
 
 app.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
   const newQueryId = await client.get(req.params.queryId);
-  console.log("1Trouble", req.params.queryId);
-
-  console.log("2Trouble", newQueryId);
   if (!newQueryId) {
     process.exit(1);
     // didn't find query id
@@ -108,21 +100,15 @@ app.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
 });
 
 app.use((req, res) => {
-  console.log(req.method);
-
-  console.log(req.path);
-  console.log(req.headers);
-  console.log(req.text);
-
-  console.log(req.body);
+  logger.debug("Request data", { req });
   res.send("Hello World!");
 });
 
 async function main() {
   await client.connect();
 
-  app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`);
+  app.listen(LISTEN_PORT, () => {
+    logger.info(`Example app listening on port ${port}`);
   });
 }
 

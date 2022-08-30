@@ -1,8 +1,6 @@
 version: "3.7"
 
 volumes:
-  node_modules:
-    driver: local
   cache:
     driver: local
 
@@ -13,12 +11,14 @@ services:
     restart: always
     volumes:
       - ./src:/app/src
-      - node_modules:/app/node_modules
     ports:
       - 8080:8080
     depends_on:
       - redis
     environment:
+      - LOG_LEVEL=debug
+      - NODE_ENV=development
+      - PRESTO_HOST=http://localhost:5110
       - REDIS_URL=redis://redis:6379
 
   redis:
