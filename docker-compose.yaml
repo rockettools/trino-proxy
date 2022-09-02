@@ -1,0 +1,31 @@
+version: "3.7"
+
+volumes:
+  cache:
+    driver: local
+
+services:
+  proxy:
+    build: .
+    container_name: trino-proxy
+    restart: always
+    volumes:
+      - ./src:/app/src
+    ports:
+      - 8080:8080
+    depends_on:
+      - redis
+    environment:
+      - LOG_LEVEL=debug
+      - NODE_ENV=development
+      - PRESTO_HOST=http://localhost:5110
+      - REDIS_URL=redis://redis:6379
+
+  redis:
+    image: redis:5.0.14-alpine3.16
+    container_name: redis
+    restart: always
+    volumes:
+      - cache:/data
+    ports:
+      - 6379:6379
