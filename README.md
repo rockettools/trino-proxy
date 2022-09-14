@@ -19,3 +19,8 @@ Format and lint the source code:
 ```sh
 make format
 ```
+
+
+```sh
+knex migrate:latest
+```
