@@ -7,7 +7,7 @@ exports.up = function (knex) {
     .createTable("query", function (table) {
       table.uuid("id").notNullable();
       table.string("status");
-      table.string("body");
+      table.text("body");
       table.string("cluster_id");
       table.string("cluster_query_id");
       table.string("trace_id");
@@ -19,12 +19,22 @@ exports.up = function (knex) {
       table.index("status");
     })
     .createTable("cluster", function (table) {
-      table.uuid("id").notNullable();
-      table.string("name").notNullable();
+      table.uuid("id").notNullable().unique();
+      table.string("name").notNullable().unique();
       table.string("url").notNullable();
       table.string("status").notNullable();
 
       table.index("id");
+    })
+    .createTable("user", function (table) {
+      table.uuid("id").notNullable().unique();
+      table.string("name").notNullable().unique();
+      table.string("role");
+      table.specificType("password", "varchar[]");
+      table.specificType("parsers", "jsonb");
+
+      table.index("id");
+      table.index("name");
     });
 };
 
