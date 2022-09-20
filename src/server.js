@@ -11,10 +11,8 @@ const {
   LISTEN_PORT = 8080,
   HTTPS_LISTEN_PORT = 8443,
   PRESTO_HOST,
-  REDIS_URL,
 } = process.env;
 if (!PRESTO_HOST) throw new Error("PRESTO_HOST not set");
-if (!REDIS_URL) throw new Error("REDIS_URL not set");
 
 const app = express();
 
@@ -45,6 +43,7 @@ app.use(async function (req, res, next) {
             if (await argon2.verify(user.password[idx], foundHeader[1])) {
               rightPassword = true;
               req.user = {
+                id: user.id,
                 username: foundHeader[0],
                 parsers: user.parsers,
               };
@@ -66,7 +65,7 @@ require("./routes")(app);
 
 app.use((req, res) => {
   //logger.debug("Request data", { req });
-  res.send("Hello World!");
+  res.send("Hello Trino!");
 });
 
 async function main() {

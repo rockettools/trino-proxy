@@ -30,13 +30,12 @@ module.exports = function (app) {
       return res.status(400).send("Invalid input.");
     }
     const hash = await argon2.hash(req.body.password);
-    console.log("HASH");
-    console.log(hash);
-    console.log(req.body);
+
     await knex("user").insert({
       id: uuidv4(),
       name: req.body.username,
       password: [hash],
+      created_at: new Date(),
     });
 
     res.json({ hash });
@@ -55,7 +54,7 @@ module.exports = function (app) {
 
     await knex("user")
       .where({ id: req.params.userId })
-      .update(_.pick(req.body, "parsers"));
+      .update(_.merge(_.pick(req.body, "parsers"), { updated_at: new Date() }));
 
     res.json({ status: "updated" });
   });

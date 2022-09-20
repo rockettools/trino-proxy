@@ -1,4 +1,4 @@
-const { client } = require("./redis");
+const { getAssumedUserForTrace } = require("./query");
 
 exports.updateUrls = function updateUrls(body, newQueryId, host) {
   const queryId = body.id;
@@ -35,13 +35,17 @@ exports.replaceAuthorizationHeader = async function replaceAuthorizationHeader(
 ) {
   let headerUser;
   if (req.headers["x-trino-trace-token"]) {
-    const info = await client.get(req.headers["x-trino-trace-token"]);
-    console.log("Trace: " + req.headers["x-trino-trace-token"], info);
+    // const info = await client.get(req.headers["x-trino-trace-token"]);
+    // console.log("Trace: " + req.headers["x-trino-trace-token"], info);
 
-    // If this is the first query in the sequence it should have the header, try and parse.
-    if (info) {
-      headerUser = info;
-    }
+    headerUser = await getAssumedUserForTrace(
+      req.headers["x-trino-trace-token"]
+    );
+
+    // // If this is the first query in the sequence it should have the header, try and parse.
+    // if (info) {
+    //   headerUser = info;
+    // }
   }
 
   if (headerUser) {

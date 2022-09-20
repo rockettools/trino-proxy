@@ -1,9 +1,10 @@
 const uuidv4 = require("uuid").v4;
 const logger = require("../lib/logger");
-const { client } = require("../lib/redis");
-const { getQueryById } = require("../lib/query");
+const { getQueryById, getAssumedUserForTrace } = require("../lib/query");
 const { knex } = require("../lib/knex");
 const axios = require("axios").default;
+const stats = require("../lib/stats");
+const cache = require("../lib/memcache");
 
 const {
   getUsernameFromAuthorizationHeader,
@@ -14,7 +15,7 @@ const {
 let schedulerRunning = false;
 let runScheduler = false;
 async function scheduleQueries() {
-  console.log("Trying to schedule");
+  logger.debug("Scheduling Pending Queries");
   if (schedulerRunning) {
     runScheduler = true;
     return;
@@ -24,7 +25,7 @@ async function scheduleQueries() {
       status: "enabled",
     });
     if (availableClusters.length === 0) {
-      console.log("No clusters");
+      logger.debug("No clusters");
       return;
     }
 
@@ -33,7 +34,9 @@ async function scheduleQueries() {
     const queriesToSchedule = await knex("query").where({
       status: "awaiting_scheduling",
     });
-    console.log("queriesToSchedule: " + currentClusterId, queriesToSchedule);
+
+    stats.histogram("queries_waiting_scheduling", queriesToSchedule.length);
+
     for (let idx = 0; idx < queriesToSchedule.length; idx++) {
       const query = queriesToSchedule[idx];
       const cluster = availableClusters[currentClusterId];
@@ -55,7 +58,7 @@ async function scheduleQueries() {
       });
     }
   } catch (err) {
-    console.log("ERROR", err);
+    logger.error("ERROR", err);
   } finally {
     schedulerRunning = false;
 
@@ -73,13 +76,17 @@ module.exports = function (app) {
     logger.debug("Statement request", {});
 
     let assumedUser;
+
+    // It doesn't seem trivial to pass groups through to the current version
+    // of trino. They seem to be associated to configured users which wont work
+    // for our dynamic user assumption.
     // let assumedGroups = [];
 
     let trinoTraceToken = null;
     if (req.headers["x-trino-trace-token"]) {
       trinoTraceToken = req.headers["x-trino-trace-token"];
-      const info = await client.get(trinoTraceToken);
-      console.log("Trace: " + trinoTraceToken, info);
+      const info = await getAssumedUserForTrace(trinoTraceToken);
+      logger.debug("Trace and already assumed user: " + trinoTraceToken, info);
 
       // If this is the first query in the sequence it should have the header, try and parse.
       if (!info) {
@@ -90,7 +97,7 @@ module.exports = function (app) {
           }
         }
 
-        // console.log("req.user.parsers", req.user.parsers);
+        // See above comment about trino groups.
         // if (req.user && req.user.parsers && req.user.parsers.groups) {
         //   //assumedGroups=[]
         //   const groupExp = new RegExp(req.user.parsers.groups, "gm");
@@ -107,9 +114,11 @@ module.exports = function (app) {
         //   // }
         // }
 
-        await client.set(trinoTraceToken, assumedUser, {
-          EX: 60 * 60,
-        });
+        // TODO probably move this to local with a fallback to PG
+        // await client.set(trinoTraceToken, assumedUser, {
+        //   EX: 60 * 60,
+        // });
+        cache.set(trinoTraceToken, assumedUser);
       } else {
         assumedUser = info;
       }
@@ -129,12 +138,17 @@ module.exports = function (app) {
 
     const newQueryId = uuidv4();
 
+    const times = new Date();
+
     await knex("query").insert({
       id: newQueryId,
       status: "awaiting_scheduling",
       body: req.body,
       trace_id: trinoTraceToken,
       assumed_user: assumedUser,
+      user: req.user.id,
+      created_at: times,
+      updated_at: times,
     });
 
     scheduleQueries();
