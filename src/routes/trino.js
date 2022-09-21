@@ -6,11 +6,7 @@ const axios = require("axios").default;
 const stats = require("../lib/stats");
 const cache = require("../lib/memcache");
 
-const {
-  getUsernameFromAuthorizationHeader,
-  updateUrls,
-  replaceAuthorizationHeader,
-} = require("../lib/helpers");
+const { updateUrls, replaceAuthorizationHeader } = require("../lib/helpers");
 
 let schedulerRunning = false;
 let runScheduler = false;
@@ -41,7 +37,14 @@ async function scheduleQueries() {
       const query = queriesToSchedule[idx];
       const cluster = availableClusters[currentClusterId];
       currentClusterId = (currentClusterId + 1) % availableClusters.length;
-      logger.debug("Submitting query: " + query.id +" "+ cluster.url + " to: "+currentClusterId);
+      logger.debug(
+        "Submitting query: " +
+          query.id +
+          " " +
+          cluster.url +
+          " to: " +
+          currentClusterId
+      );
       await axios({
         url: cluster.url + "/v1/statement",
         method: "post",
@@ -71,22 +74,28 @@ async function scheduleQueries() {
 }
 
 async function runScheduledScheduleQueries() {
-  try{
+  try {
     await scheduleQueries();
-  }catch(err){}
-      setTimeout(runScheduledScheduleQueries, 10000);
+  } catch (err) {
+    logger.error(err);
+  }
+  setTimeout(runScheduledScheduleQueries, 10000);
 }
 
 setTimeout(runScheduledScheduleQueries, 10000);
 
 module.exports = function (app) {
   app.post("/v1/statement", async (req, res) => {
-    logger.debug("Statement request", {});
-    
-    if (req.body.length<5) {
-      return res.status(400).send('Invalid SQL');
+    if (!req.user) {
+      return res.status(401).send("Unauthorized");
+    }
+    logger.debug("Submitting Statement");
+
+    if (req.body.length < 5) {
+      return res.status(400).send("Invalid SQL");
     }
 
+    // TODO the assumedUser/real user pair should probably be locked for the trace set
     let assumedUser;
 
     // It doesn't seem trivial to pass groups through to the current version
@@ -136,17 +145,10 @@ module.exports = function (app) {
       }
     }
 
-    if (assumedUser) {
-      req.headers.authorization =
-        "Basic " + Buffer.from(assumedUser).toString("base64");
-    } else {
-      const username = getUsernameFromAuthorizationHeader(
-        req.headers.authorization
-      );
-      if (username) {
-        req.headers.authorization = username;
-      }
-    }
+    assumedUser = assumedUser || req.user.username;
+    req.headers.authorization =
+      "Basic " +
+      Buffer.from(req.user.username + "__" + assumedUser).toString("base64");
 
     const newQueryId = uuidv4();
 
@@ -185,9 +187,14 @@ module.exports = function (app) {
   });
 
   app.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
-    logger.debug("Statement fetching status for query: "+req.params.queryId+" key: "+req.params.keyId +
+    logger.debug(
+      "Statement fetching status for query: " +
+        req.params.queryId +
+        " key: " +
+        req.params.keyId +
         " num: " +
-        req.params.num);
+        req.params.num
+    );
     const query = await getQueryById(req.params.queryId);
 
     // If we are unable to find the queryMapping we're in trouble, fail the query.
