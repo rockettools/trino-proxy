@@ -66,13 +66,18 @@ async function scheduleQueries() {
     if (runScheduler) {
       runScheduler = false;
       scheduleQueries();
-    }else{
-      setTimeout(scheduleQueries, 10000);
     }
   }
 }
 
-setTimeout(scheduleQueries, 10000);
+async function runScheduledScheduleQueries() {
+  try{
+    await scheduleQueries();
+  }catch(err){}
+      setTimeout(runScheduledScheduleQueries, 10000);
+}
+
+setTimeout(runScheduledScheduleQueries, 10000);
 
 module.exports = function (app) {
   app.post("/v1/statement", async (req, res) => {
