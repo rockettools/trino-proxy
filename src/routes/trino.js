@@ -185,7 +185,9 @@ module.exports = function (app) {
   });
 
   app.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
-    logger.debug("Statement fetching status 1", {});
+    logger.debug("Statement fetching status for query: "+req.params.queryId+" key: "+req.params.keyId +
+        " num: " +
+        req.params.num);
     const query = await getQueryById(req.params.queryId);
 
     // If we are unable to find the queryMapping we're in trouble, fail the query.
