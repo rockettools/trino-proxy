@@ -41,6 +41,7 @@ async function scheduleQueries() {
       const query = queriesToSchedule[idx];
       const cluster = availableClusters[currentClusterId];
       currentClusterId = (currentClusterId + 1) % availableClusters.length;
+      logger.debug("Submitting query: " + query.id + " to: "+currentClusterId);
       await axios({
         url: cluster.url + "/v1/statement",
         method: "post",
