@@ -8,6 +8,7 @@ FROM gcr.io/distroless/nodejs:16
 WORKDIR /app
 COPY --from=builder /app/node_modules /app/node_modules
 COPY src /app/src
+COPY migrations /app/migrations
 
 EXPOSE 8080
 CMD ["/app/src/server.js"]
