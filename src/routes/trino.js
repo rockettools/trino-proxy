@@ -146,7 +146,7 @@ module.exports = function (app) {
       body: req.body,
       trace_id: trinoTraceToken,
       assumed_user: assumedUser,
-      user: req.user.id,
+      user: req.user ? req.user.id : null,
       created_at: times,
       updated_at: times,
     });
