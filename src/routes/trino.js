@@ -77,6 +77,10 @@ setTimeout(scheduleQueries, 10000);
 module.exports = function (app) {
   app.post("/v1/statement", async (req, res) => {
     logger.debug("Statement request", {});
+    
+    if (req.body.length<5) {
+      return res.status(400).send('Invalid SQL');
+    }
 
     let assumedUser;
 
