@@ -26,6 +26,8 @@ app.use(express.json()); // for parsing application/json
 app.use(express.text()); // for parsing plain/text
 
 app.use(async function (req, res, next) {
+  let username, password; // X-Trino-User
+
   if (req.headers["authorization"]) {
     let header = req.headers["authorization"];
     if (typeof header === "string") {
@@ -37,33 +39,46 @@ app.use(async function (req, res, next) {
           .toString()
           .split(":");
 
-        const user = await knex("user")
-          .where({
-            name: foundHeader[0],
-          })
-          .first();
+        username = foundHeader[0];
+        password = foundHeader[1];
 
-        if (user) {
-          let rightPassword = false;
-          for (let idx = 0; idx < user.password.length; idx++) {
-            if (await argon2.verify(user.password[idx], foundHeader[1])) {
-              rightPassword = true;
-              req.user = {
-                id: user.id,
-                username: foundHeader[0],
-                parsers: user.parsers,
-              };
-            }
-          }
-          if (!rightPassword) {
-            return res.status(401).send("Bad user/password");
-          }
+        // only bother with the first one
+        break;
+      }
+    }
+  } else if (req.headers["x-trino-user"]) {
+    username = req.headers["x-trino-user"];
+  }
+
+  if (username) {
+    const user = await knex("user")
+      .where({
+        name: username,
+      })
+      .first();
+
+    if (user) {
+      let rightPassword = false;
+
+      // check all passwords to allow for password rotation
+      for (let idx = 0; idx < user.password.length; idx++) {
+        if (await argon2.verify(user.password[idx], password)) {
+          rightPassword = true;
         }
+      }
 
-        break; // only bother with the first one
+      if (!rightPassword && user.password.length !== 0) {
+        return res.status(401).send("Bad user/password");
+      } else {
+        req.user = {
+          id: user.id,
+          username: username,
+          parsers: user.parsers,
+        };
       }
     }
   }
+
   next();
 });
 

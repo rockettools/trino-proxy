@@ -52,9 +52,23 @@ module.exports = function (app) {
       return res.status(404).send("not found");
     }
 
+    if (req.body.password) {
+      if (typeof req.body.password === "string") {
+        req.body.password = [req.body.password];
+      }
+      let hashedPasswords = [];
+      for (let idx = 0; idx < req.body.password.length; idx++) {
+        hashedPasswords.push(await argon2.hash(req.body.password[idx]));
+      }
+    }
+
     await knex("user")
       .where({ id: req.params.userId })
-      .update(_.merge(_.pick(req.body, "parsers"), { updated_at: new Date() }));
+      .update(
+        _.merge(_.pick(req.body, "parsers", "password"), {
+          updated_at: new Date(),
+        })
+      );
 
     res.json({ status: "updated" });
   });
