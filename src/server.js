@@ -15,9 +15,15 @@ const {
 if (!PRESTO_HOST) throw new Error("PRESTO_HOST not set");
 
 const app = express();
-
+app.use(function (req, res, next) {
+  if (!req.headers["content-type"]) {
+    console.log("Overriding header");
+    req.headers["content-type"] = "text/plain";
+  }
+  next();
+});
 app.use(express.json()); // for parsing application/json
-app.use(express.text()); // for parsing application/json
+app.use(express.text()); // for parsing plain/text
 
 app.use(async function (req, res, next) {
   if (req.headers["authorization"]) {
@@ -64,7 +70,7 @@ app.use(async function (req, res, next) {
 require("./routes")(app);
 
 app.use((req, res) => {
-  //logger.debug("Request data", { req });
+  logger.debug("Request data", { req });
   res.send("Hello Trino!");
 });
 
