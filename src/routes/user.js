@@ -26,19 +26,30 @@ module.exports = function (app) {
         return res.status(401).send("Unauthorized");
       }
     }
-    if (!req.body.password) {
+    if (!req.user && !req.body.password) {
       return res.status(400).send("Invalid input.");
     }
-    const hash = await argon2.hash(req.body.password);
 
+    if (req.body.password) {
+      if (typeof req.body.password === "string") {
+        req.body.password = [req.body.password];
+      }
+      let hashedPasswords = [];
+      for (let idx = 0; idx < req.body.password.length; idx++) {
+        hashedPasswords.push(await argon2.hash(req.body.password[idx]));
+      }
+      req.body.password = hashedPasswords;
+    }
+
+    const userId = uuidv4();
     await knex("user").insert({
-      id: uuidv4(),
+      id: userId,
       name: req.body.username,
-      password: [hash],
+      password: req.body.password,
       created_at: new Date(),
     });
 
-    res.json({ hash });
+    res.json({ id: userId });
   });
   app.patch("/v1/user/:userId", async function (req, res) {
     // pull the user
@@ -60,6 +71,7 @@ module.exports = function (app) {
       for (let idx = 0; idx < req.body.password.length; idx++) {
         hashedPasswords.push(await argon2.hash(req.body.password[idx]));
       }
+      req.body.password = hashedPasswords;
     }
 
     await knex("user")
