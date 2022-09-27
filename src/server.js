@@ -76,7 +76,7 @@ app.use(async function (req, res, next) {
         }
       }
 
-      if (!rightPassword && user.password.length !== 0) {
+      if (!rightPassword && user.password && user.password.length !== 0) {
         return res.status(401).send("Bad user/password");
       } else {
         req.user = {
