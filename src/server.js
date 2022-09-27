@@ -63,7 +63,7 @@ app.use(async function (req, res, next) {
     if (user) {
       let rightPassword = false;
 
-      if (!password && user.password.length > 0) {
+      if (!password && user.password && user.password.length > 0) {
         return res.status(401).send("Bad user/password");
       }
 
