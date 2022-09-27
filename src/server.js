@@ -41,6 +41,7 @@ app.use(async function (req, res, next) {
 
         username = foundHeader[0];
         password = foundHeader[1];
+        logger.debug("Found Auth header: " + username);
 
         // only bother with the first one
         break;
@@ -48,6 +49,7 @@ app.use(async function (req, res, next) {
     }
   } else if (req.headers["x-trino-user"]) {
     username = req.headers["x-trino-user"];
+    logger.debug("Found Trino User header: " + username);
   }
 
   if (username) {
@@ -59,6 +61,10 @@ app.use(async function (req, res, next) {
 
     if (user) {
       let rightPassword = false;
+
+      if (!password && user.password.length > 0) {
+        return res.status(401).send("Bad user/password");
+      }
 
       // check all passwords to allow for password rotation
       for (let idx = 0; idx < user.password.length; idx++) {
