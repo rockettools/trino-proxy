@@ -26,6 +26,8 @@ app.use(express.json()); // for parsing application/json
 app.use(express.text()); // for parsing plain/text
 
 app.use(async function (req, res, next) {
+  console.log("EXTRA DEBUG: ", req);
+
   let username, password; // X-Trino-User
 
   if (req.headers["authorization"]) {
