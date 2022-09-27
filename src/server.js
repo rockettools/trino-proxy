@@ -67,10 +67,12 @@ app.use(async function (req, res, next) {
         return res.status(401).send("Bad user/password");
       }
 
-      // check all passwords to allow for password rotation
-      for (let idx = 0; idx < user.password.length; idx++) {
-        if (await argon2.verify(user.password[idx], password)) {
-          rightPassword = true;
+      if (user.password) {
+        // check all passwords to allow for password rotation
+        for (let idx = 0; idx < user.password.length; idx++) {
+          if (await argon2.verify(user.password[idx], password)) {
+            rightPassword = true;
+          }
         }
       }
 
