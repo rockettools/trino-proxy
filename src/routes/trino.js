@@ -91,9 +91,11 @@ module.exports = function (app) {
     }
     logger.debug("Submitting Statement");
 
-    if (req.body.length < 5) {
-      return res.status(400).send("Invalid SQL");
-    }
+    // if (req.body.length < 5) {
+    //   return res.status(400).send("Invalid SQL");
+    // }
+
+    if (process.env.LOG_QUERY) logger.debug("Submitting Query: " + req.body);
 
     // TODO the assumedUser/real user pair should probably be locked for the trace set
     let assumedUser;
@@ -151,7 +153,6 @@ module.exports = function (app) {
       Buffer.from(req.user.username + "__" + assumedUser).toString("base64");
 
     const newQueryId = uuidv4();
-
     const times = new Date();
 
     await knex("query").insert({
