@@ -62,8 +62,6 @@ async function getQueryStatus(clusterId, queryId) {
     throw err;
   }
 
-  console.log("result", result);
-
   return {
     state: stateMap[result.data.state] || result.data.state,
     cumulativeUserMemoryMB: _.get(
