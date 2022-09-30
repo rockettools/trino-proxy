@@ -5,7 +5,7 @@ const { getQueryStatus } = require("./lib/cluster");
 
 async function babysit() {
   const currentQueries = await knex.raw(
-    `select * from query where not status like any('{lost,finished}')`
+    `select * from query where not status like any('{lost,finished,failed}')`
   );
 
   await BPromise.map(
