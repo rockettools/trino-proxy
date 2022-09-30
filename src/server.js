@@ -42,7 +42,7 @@ app.use(async function (req, res, next) {
         password = foundHeader[1];
         logger.debug("Found Auth header: " + username);
 
-        // only bother with the first one
+        // only accept the first Authorization header
         break;
       }
     }
@@ -119,3 +119,7 @@ async function main() {
 }
 
 main();
+
+if (!process.env.DISABLE_BABYSITTER) {
+  require("./babysitter")();
+}

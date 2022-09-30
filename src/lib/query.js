@@ -22,7 +22,6 @@ exports.getFirstQueryByTraceId = async function getQueryByTraceId(traceId) {
 };
 
 exports.getAssumedUserForTrace = async function (traceId) {
-  // trinoTraceToken = req.headers["x-trino-trace-token"];
   const cachedUser = await cache.get(traceId);
   if (cachedUser) {
     return cachedUser;
