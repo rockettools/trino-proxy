@@ -42,7 +42,7 @@ module.exports = async function () {
   }
 
   setTimeout(
-    babysit,
+    module.exports,
     process.env.BABYSIT_DELAY ? parseInt(process.env.BABYSIT_DELAY) : 3000
   );
 };

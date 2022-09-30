@@ -59,6 +59,9 @@ async function getQueryStatus(clusterId, queryId) {
     if (_.get(err, "response.status") === 404) {
       return null;
     }
+    if (_.get(err, "response.status") === 410) {
+      return null;
+    }
     throw err;
   }
 
