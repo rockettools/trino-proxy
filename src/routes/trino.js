@@ -84,6 +84,16 @@ async function runScheduledScheduleQueries() {
 
 setTimeout(runScheduledScheduleQueries, 10000);
 
+function getHost(req) {
+  return (
+    (req.headers["x-forwarded-proto"]
+      ? req.headers["x-forwarded-proto"] // TODO make sure this is only http or https
+      : req.protocol) +
+    "://" +
+    req.get("host")
+  );
+}
+
 module.exports = function (app) {
   app.post("/v1/statement", async (req, res) => {
     if (!req.user) {
@@ -182,7 +192,7 @@ module.exports = function (app) {
           },
         },
         newQueryId,
-        req.protocol + "://" + req.get("host")
+        getHost(req)
       )
     );
   });
@@ -221,7 +231,7 @@ module.exports = function (app) {
             },
           },
           query.id,
-          req.protocol + "://" + req.get("host")
+          getHost(req)
         )
       );
     }
@@ -242,7 +252,7 @@ module.exports = function (app) {
             },
           },
           query.id,
-          req.protocol + "://" + req.get("host")
+          getHost(req)
         )
       );
     }
@@ -268,7 +278,7 @@ module.exports = function (app) {
         const newBody = updateUrls(
           response.data,
           req.params.queryId,
-          req.protocol + "://" + req.get("host")
+          getHost(req)
         );
 
         res.json(newBody);
@@ -324,7 +334,7 @@ module.exports = function (app) {
         const newBody = updateUrls(
           response.data,
           req.params.queryId,
-          req.protocol + "://" + req.get("host")
+          getHost(req)
         );
         res.json(newBody);
       })
