@@ -18,7 +18,6 @@ services:
     environment:
       - LOG_LEVEL=debug
       - NODE_ENV=development
-      - PRESTO_HOST=http://localhost:5110
       - REDIS_URL=redis://redis:6379
 
   redis:

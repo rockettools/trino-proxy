@@ -1,7 +1,8 @@
 const argon2 = require("argon2");
-const { knex } = require("../lib/knex");
 const uuidv4 = require("uuid").v4;
 const _ = require("lodash");
+
+const { knex } = require("../lib/knex");
 
 module.exports = function (app) {
   app.get("/v1/user", async function (req, res) {
@@ -12,22 +13,24 @@ module.exports = function (app) {
       }),
     });
   });
+
   app.get("/v1/user/me", async function (req, res) {
     res.json(req.user);
   });
+
   app.post("/v1/user", async function (req, res) {
     // pull the user
 
     if (!req.user) {
       // unless this is the first user, we should block this
       const c = await knex("user").count("*");
-      console.log("c", c);
       if (c[0].count > 0) {
-        return res.status(401).send("Unauthorized");
+        return res.status(401).json({ error: "Unauthorized" });
       }
     }
+
     if (!req.user && !req.body.password) {
-      return res.status(400).send("Invalid input.");
+      return res.status(400).json({ error: "Invalid input" });
     }
 
     if (req.body.password) {
@@ -51,16 +54,17 @@ module.exports = function (app) {
 
     res.json({ id: userId });
   });
+
   app.patch("/v1/user/:userId", async function (req, res) {
     // pull the user
 
     if (!req.user) {
-      return res.status(401).send("Unauthorized");
+      return res.status(401).json({ error: "Unauthorized" });
     }
     const user = await knex("user").where({ id: req.params.userId }).first();
 
     if (!user) {
-      return res.status(404).send("not found");
+      return res.status(404).json({ error: "Not found" });
     }
 
     if (req.body.password) {

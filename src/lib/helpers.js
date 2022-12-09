@@ -1,6 +1,6 @@
 const { getAssumedUserForTrace } = require("./query");
 
-exports.updateUrls = function updateUrls(body, newQueryId, host) {
+function updateUrls(body, newQueryId, host) {
   const queryId = body.id;
   body.id = newQueryId;
 
@@ -15,37 +15,26 @@ exports.updateUrls = function updateUrls(body, newQueryId, host) {
       .replace(/https?:\/\/[^/]+/, host);
   }
   return body;
-};
+}
 
-exports.getUsernameFromAuthorizationHeader =
-  function getUsernameFromAuthorizationHeader(header) {
-    if (header) {
-      if (typeof header === "string") {
-        header = [header];
-      }
-      for (let idx = 0; idx < header.length; idx++) {
-        if (header[idx].indexOf("Basic ") === 0)
-          return Buffer.from(header[idx].split(" ")[1], "base64").toString();
-      }
+function getUsernameFromAuthorizationHeader(header) {
+  if (header) {
+    if (typeof header === "string") {
+      header = [header];
     }
-  };
+    for (let idx = 0; idx < header.length; idx++) {
+      if (header[idx].indexOf("Basic ") === 0)
+        return Buffer.from(header[idx].split(" ")[1], "base64").toString();
+    }
+  }
+}
 
-exports.replaceAuthorizationHeader = async function replaceAuthorizationHeader(
-  req
-) {
+async function replaceAuthorizationHeader(req) {
   let headerUser;
   if (req.headers["x-trino-trace-token"]) {
-    // const info = await client.get(req.headers["x-trino-trace-token"]);
-    // console.log("Trace: " + req.headers["x-trino-trace-token"], info);
-
     headerUser = await getAssumedUserForTrace(
       req.headers["x-trino-trace-token"]
     );
-
-    // // If this is the first query in the sequence it should have the header, try and parse.
-    // if (info) {
-    //   headerUser = info;
-    // }
   }
 
   if (headerUser) {
@@ -53,4 +42,10 @@ exports.replaceAuthorizationHeader = async function replaceAuthorizationHeader(
     req.headers.authorization =
       "Basic " + Buffer.from(headerUser).toString("base64");
   }
+}
+
+module.exports = {
+  getUsernameFromAuthorizationHeader,
+  replaceAuthorizationHeader,
+  updateUrls,
 };

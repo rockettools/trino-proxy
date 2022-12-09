@@ -20,15 +20,6 @@ Format and lint the source code:
 make format
 ```
 
-
 ```sh
 knex migrate:latest
-```
-
-```
-DD_PREFIX
-DD_AGENT_HOST
-DD_DOGSTATSD_PORT
-TRACE_CACHE_SIZE
-NODE_ENV
 ```
