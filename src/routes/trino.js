@@ -1,13 +1,15 @@
+const express = require("express");
 const uuidv4 = require("uuid").v4;
-const logger = require("../lib/logger");
-const { getQueryById, getAssumedUserForTrace } = require("../lib/query");
-const { knex } = require("../lib/knex");
 const axios = require("axios").default;
-const stats = require("../lib/stats");
-const cache = require("../lib/memcache");
 
 const { updateUrls, replaceAuthorizationHeader } = require("../lib/helpers");
+const { knex } = require("../lib/knex");
+const logger = require("../lib/logger");
+const cache = require("../lib/memcache");
+const { getQueryById, getAssumedUserForTrace } = require("../lib/query");
+const stats = require("../lib/stats");
 
+const router = express.Router();
 let schedulerRunning = false;
 let runScheduler = false;
 
@@ -99,242 +101,238 @@ function getHost(req) {
   );
 }
 
-module.exports = function (app) {
-  app.post("/v1/statement", async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+router.post("/v1/statement", async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
-    logger.debug("Submitting Statement");
-    if (process.env.LOG_QUERY) {
-      logger.debug("Submitting Query: " + req.body);
-    }
+  logger.debug("Submitting Statement");
+  if (process.env.LOG_QUERY) {
+    logger.debug("Submitting Query: " + req.body);
+  }
 
-    // TODO the assumedUser/real user pair should probably be locked for the trace set
-    let assumedUser;
+  // TODO the assumedUser/real user pair should probably be locked for the trace set
+  let assumedUser;
 
-    // It doesn't seem trivial to pass groups through to the current version
-    // of trino. They seem to be associated to configured users which wont work
-    // for our dynamic user assumption.
-    // let assumedGroups = [];
+  // It doesn't seem trivial to pass groups through to the current version
+  // of trino. They seem to be associated to configured users which wont work
+  // for our dynamic user assumption.
+  // let assumedGroups = [];
 
-    let trinoTraceToken = null;
-    if (req.headers["x-trino-trace-token"]) {
-      trinoTraceToken = req.headers["x-trino-trace-token"];
-      const info = await getAssumedUserForTrace(trinoTraceToken);
-      logger.debug("Trace and already assumed user: " + trinoTraceToken, info);
+  let trinoTraceToken = null;
+  if (req.headers["x-trino-trace-token"]) {
+    trinoTraceToken = req.headers["x-trino-trace-token"];
+    const info = await getAssumedUserForTrace(trinoTraceToken);
+    logger.debug("Trace and already assumed user: " + trinoTraceToken, info);
 
-      // If this is the first query in the sequence it should have the header, try and parse.
-      if (!info) {
-        if (req.user && req.user.parsers && req.user.parsers.user) {
-          const parsedUser = new RegExp(req.user.parsers.user).exec(req.body);
-          if (parsedUser) {
-            assumedUser = parsedUser[1];
-          }
+    // If this is the first query in the sequence it should have the header, try and parse.
+    if (!info) {
+      if (req.user && req.user.parsers && req.user.parsers.user) {
+        const parsedUser = new RegExp(req.user.parsers.user).exec(req.body);
+        if (parsedUser) {
+          assumedUser = parsedUser[1];
         }
-
-        cache.set(trinoTraceToken, assumedUser);
-      } else {
-        assumedUser = info;
       }
+
+      cache.set(trinoTraceToken, assumedUser);
+    } else {
+      assumedUser = info;
     }
+  }
 
-    assumedUser = assumedUser || req.user.username;
-    req.headers.authorization =
-      "Basic " +
-      Buffer.from(req.user.username + "__" + assumedUser).toString("base64");
+  assumedUser = assumedUser || req.user.username;
+  req.headers.authorization =
+    "Basic " +
+    Buffer.from(req.user.username + "__" + assumedUser).toString("base64");
 
-    const newQueryId = uuidv4();
-    const times = new Date();
+  const newQueryId = uuidv4();
+  const times = new Date();
 
-    await knex("query").insert({
-      id: newQueryId,
-      status: "awaiting_scheduling",
-      body: req.body,
-      trace_id: trinoTraceToken,
-      assumed_user: assumedUser,
-      user: req.user ? req.user.id : null,
-      created_at: times,
-      updated_at: times,
+  await knex("query").insert({
+    id: newQueryId,
+    status: "awaiting_scheduling",
+    body: req.body,
+    trace_id: trinoTraceToken,
+    assumed_user: assumedUser,
+    user: req.user ? req.user.id : null,
+    created_at: times,
+    updated_at: times,
+  });
+
+  scheduleQueries();
+
+  return res.json(
+    updateUrls(
+      {
+        id: newQueryId,
+        infoUri: "http://localhost:5110/ui/query.html?" + newQueryId,
+        nextUri:
+          "http://localhost:5110/v1/statement/queued/" +
+          newQueryId +
+          "/mock_next_uri/1",
+        stats: {
+          state: "QUEUED",
+        },
+      },
+      newQueryId,
+      getHost(req)
+    )
+  );
+});
+
+router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
+  logger.debug(
+    "Statement fetching status for query: " +
+      req.params.queryId +
+      " key: " +
+      req.params.keyId +
+      " num: " +
+      req.params.num
+  );
+  const query = await getQueryById(req.params.queryId);
+
+  // If we are unable to find the queryMapping we're in trouble, fail the query.
+  if (!query) {
+    return res.status(404).json({
+      error: "Query not found.",
     });
+  }
 
-    scheduleQueries();
-
+  if (query.status === "awaiting_scheduling") {
+    // TODO retur
     return res.json(
       updateUrls(
         {
-          id: newQueryId,
-          infoUri: "http://localhost:5110/ui/query.html?" + newQueryId,
+          id: query.id,
+          infoUri: "http://localhost:5110/ui/query.html?" + query.id,
           nextUri:
             "http://localhost:5110/v1/statement/queued/" +
-            newQueryId +
+            query.id +
             "/mock_next_uri/1",
           stats: {
             state: "QUEUED",
           },
         },
-        newQueryId,
+        query.id,
         getHost(req)
       )
     );
-  });
+  }
 
-  app.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
-    logger.debug(
-      "Statement fetching status for query: " +
-        req.params.queryId +
-        " key: " +
-        req.params.keyId +
-        " num: " +
-        req.params.num
+  if (req.params.keyId === "mock_next_uri") {
+    return res.json(
+      updateUrls(
+        {
+          id: query.id,
+          infoUri: "http://localhost:5110/ui/query.html?" + query.id,
+          nextUri:
+            "http://localhost:5110/v1/statement/queued/" +
+            query.id +
+            "/" +
+            query.next_uri,
+          stats: {
+            state: "QUEUED",
+          },
+        },
+        query.id,
+        getHost(req)
+      )
     );
-    const query = await getQueryById(req.params.queryId);
+  }
 
-    // If we are unable to find the queryMapping we're in trouble, fail the query.
-    if (!query) {
-      return res.status(404).json({
-        error: "Query not found.",
-      });
-    }
+  const cluster = await knex("cluster").where({ id: query.cluster_id }).first();
 
-    if (query.status === "awaiting_scheduling") {
-      // TODO retur
-      return res.json(
-        updateUrls(
-          {
-            id: query.id,
-            infoUri: "http://localhost:5110/ui/query.html?" + query.id,
-            nextUri:
-              "http://localhost:5110/v1/statement/queued/" +
-              query.id +
-              "/mock_next_uri/1",
-            stats: {
-              state: "QUEUED",
-            },
-          },
-          query.id,
-          getHost(req)
-        )
+  await replaceAuthorizationHeader(req);
+  axios({
+    url:
+      cluster.url +
+      "/v1/statement/queued/" +
+      query.cluster_query_id +
+      "/" +
+      req.params.keyId +
+      "/" +
+      req.params.num,
+    method: "get",
+    headers: req.headers,
+  })
+    .then(function (response) {
+      const newBody = updateUrls(
+        response.data,
+        req.params.queryId,
+        getHost(req)
       );
-    }
 
-    if (req.params.keyId === "mock_next_uri") {
-      return res.json(
-        updateUrls(
-          {
-            id: query.id,
-            infoUri: "http://localhost:5110/ui/query.html?" + query.id,
-            nextUri:
-              "http://localhost:5110/v1/statement/queued/" +
-              query.id +
-              "/" +
-              query.next_uri,
-            stats: {
-              state: "QUEUED",
-            },
-          },
-          query.id,
-          getHost(req)
-        )
+      res.json(newBody);
+    })
+    .catch(function (err) {
+      if (err.response && err.response.status === 404) {
+        console.log(
+          "Query not found: " +
+            query.cluster_query_id +
+            "/" +
+            req.params.keyId +
+            "/" +
+            req.params.num
+        );
+        return res.status(404).json({ error: "Query not found" });
+      }
+
+      // TODO: why are killing the server here?
+      process.exit(1);
+    });
+});
+
+router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
+  logger.debug("Statement fetching status 2", {});
+
+  const query = await getQueryById(req.params.queryId);
+  // If we are unable to find the queryMapping we're in trouble, fail the query.
+  if (!query) {
+    return res.status(404).json({
+      error: "Query not found.",
+    });
+  }
+
+  const cluster = await knex("cluster").where({ id: query.cluster_id }).first();
+
+  await replaceAuthorizationHeader(req);
+
+  axios({
+    url:
+      cluster.url +
+      "/v1/statement/executing/" +
+      query.cluster_query_id +
+      "/" +
+      req.params.keyId +
+      "/" +
+      req.params.num,
+    method: "get",
+    headers: req.headers,
+  })
+    .then(function (response) {
+      const newBody = updateUrls(
+        response.data,
+        req.params.queryId,
+        getHost(req)
       );
-    }
-
-    const cluster = await knex("cluster")
-      .where({ id: query.cluster_id })
-      .first();
-
-    await replaceAuthorizationHeader(req);
-    axios({
-      url:
-        cluster.url +
-        "/v1/statement/queued/" +
-        query.cluster_query_id +
-        "/" +
-        req.params.keyId +
-        "/" +
-        req.params.num,
-      method: "get",
-      headers: req.headers,
+      res.json(newBody);
     })
-      .then(function (response) {
-        const newBody = updateUrls(
-          response.data,
-          req.params.queryId,
-          getHost(req)
+    .catch(function (err) {
+      if (err.response && err.response.status === 404) {
+        console.log(
+          "Query not found when executing: " +
+            query.cluster_query_id +
+            "/" +
+            req.params.keyId +
+            "/" +
+            req.params.num
         );
+        return res.status(404).json({ error: "Query not found" });
+      }
 
-        res.json(newBody);
-      })
-      .catch(function (err) {
-        if (err.response && err.response.status === 404) {
-          console.log(
-            "Query not found: " +
-              query.cluster_query_id +
-              "/" +
-              req.params.keyId +
-              "/" +
-              req.params.num
-          );
-          return res.status(404).json({ error: "Query not found" });
-        }
+      // TODO: why are killing the server here?
+      process.exit(1);
+    });
+});
 
-        // TODO: why are killing the server here?
-        process.exit(1);
-      });
-  });
-
-  app.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
-    logger.debug("Statement fetching status 2", {});
-
-    const query = await getQueryById(req.params.queryId);
-    // If we are unable to find the queryMapping we're in trouble, fail the query.
-    if (!query) {
-      return res.status(404).json({
-        error: "Query not found.",
-      });
-    }
-
-    const cluster = await knex("cluster")
-      .where({ id: query.cluster_id })
-      .first();
-
-    await replaceAuthorizationHeader(req);
-
-    axios({
-      url:
-        cluster.url +
-        "/v1/statement/executing/" +
-        query.cluster_query_id +
-        "/" +
-        req.params.keyId +
-        "/" +
-        req.params.num,
-      method: "get",
-      headers: req.headers,
-    })
-      .then(function (response) {
-        const newBody = updateUrls(
-          response.data,
-          req.params.queryId,
-          getHost(req)
-        );
-        res.json(newBody);
-      })
-      .catch(function (err) {
-        if (err.response && err.response.status === 404) {
-          console.log(
-            "Query not found when executing: " +
-              query.cluster_query_id +
-              "/" +
-              req.params.keyId +
-              "/" +
-              req.params.num
-          );
-          return res.status(404).json({ error: "Query not found" });
-        }
-
-        // TODO: why are killing the server here?
-        process.exit(1);
-      });
-  });
-};
+module.exports = router;

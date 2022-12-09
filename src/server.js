@@ -1,3 +1,4 @@
+const _ = require("lodash");
 const express = require("express");
 const http = require("http");
 const https = require("https");
@@ -22,14 +23,28 @@ app.use(express.text()); // for parsing plain/text
 
 // Middleware: authentication
 app.use(authenticationMiddleware);
-// Middleware: log request data and set default response
-app.use((req, res) => {
-  logger.debug("Request data", { req });
-  res.json({});
+// Middleware: log request data
+app.use((req, _res, next) => {
+  logger.debug(
+    "Request data",
+    _.pick(req, ["url", "body", "params", "query", "rawHeaders"])
+  );
+  next();
 });
 
 // Add routes
-require("./routes/index")(app);
+app.use("/", require("./routes/cluster"));
+app.use("/", require("./routes/trino"));
+app.use("/", require("./routes/user"));
+
+// Fallback handler
+app.use("/", (req, res) => {
+  logger.debug(
+    "No matching route",
+    _.pick(req, ["url", "body", "params", "query", "rawHeaders"])
+  );
+  return res.status(404).json({ error: "No matching route" });
+});
 
 // Setup server and start listening for requests
 if (HTTPS_ENABLED) {
