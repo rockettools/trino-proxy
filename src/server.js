@@ -5,10 +5,10 @@ const https = require("https");
 const logger = require("./lib/logger");
 const authenticationMiddleware = require("./middlewares/authentication");
 
-const LISTEN_PORT = parseInt(process.env.LISTEN_PORT) || 8080;
+const HTTP_ENABLED = process.env.HTTP_ENABLED === "true";
+const HTTP_LISTEN_PORT = parseInt(process.env.HTTP_LISTEN_PORT) || 8080;
+const HTTPS_ENABLED = process.env.HTTPS_ENABLED === "true";
 const HTTPS_LISTEN_PORT = parseInt(process.env.HTTPS_LISTEN_PORT) || 8443;
-const ENABLE_HTTP = process.env.ENABLE_HTTP === "true";
-const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
 
 const app = express();
 
@@ -32,7 +32,7 @@ app.use((req, res) => {
 require("./routes/index")(app);
 
 // Setup server and start listening for requests
-if (ENABLE_HTTPS) {
+if (HTTPS_ENABLED) {
   const credentials = {
     key: process.env.HTTPS_KEY,
     cert: process.env.HTTPS_CERT,
@@ -41,9 +41,9 @@ if (ENABLE_HTTPS) {
   httpsServer.listen(HTTPS_LISTEN_PORT);
 }
 
-if (!ENABLE_HTTPS || ENABLE_HTTP) {
+if (!HTTPS_ENABLED || HTTP_ENABLED) {
   const httpServer = http.createServer(app);
-  httpServer.listen(LISTEN_PORT);
+  httpServer.listen(HTTP_LISTEN_PORT);
 }
 
 // Require babysitter last once server is setup and running successfully

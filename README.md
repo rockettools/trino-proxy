@@ -23,3 +23,21 @@ make format
 ```sh
 knex migrate:latest
 ```
+
+## Configuration
+
+- BABYSITTER_DELAY: interval for babysitter worker (default: 3 seconds)
+- BABYSITTER_DISABLED: disable the query babysitter (set to true)
+- DB_URL: postgres database connection string
+- HTTP_ENABLED: whether HTTP server is enabled (set to true)
+- HTTP_LISTEN_PORT: HTTP port (default: 8080)
+- HTTPS_CERT: HTTPS certificate
+- HTTPS_ENABLED: whether HTTPS server is enabled (set to true)
+- HTTPS_KEY: HTTPS private key
+- HTTPS_LISTEN_PORT: HTTPS port (default: 8443)
+- LOG_LEVEL: log level (default: info)
+- LOG_QUERY: whether queries are logged
+- NODE_ENV: development or production
+- STATSD_HOST: statsd agent host (default: localhost)
+- STATSD_PORT: statsd agent port (default: 8125)
+- STATSD_PREFIX: prefix for statsd metrics (default: trino_proxy)

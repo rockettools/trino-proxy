@@ -4,9 +4,9 @@ const { getQueryStatus } = require("./lib/cluster");
 const { knex } = require("./lib/knex");
 const logger = require("./lib/logger");
 
-const DISABLE_BABYSITTER = process.env.DISABLE_BABYSITTER === "true";
-const BABYSIT_DELAY = process.env.BABYSIT_DELAY
-  ? parseInt(process.env.BABYSIT_DELAY)
+const BABYSITTER_DISABLED = process.env.BABYSITTER_DISABLED === "true";
+const BABYSITTER_DELAY = process.env.BABYSITTER_DELAY
+  ? parseInt(process.env.BABYSITTER_DELAY)
   : 3000;
 
 async function babysitQueries() {
@@ -47,10 +47,10 @@ async function runBabysitAndReschedule() {
   }
 
   // Reschdule task for the future
-  setTimeout(module.exports, BABYSIT_DELAY);
+  setTimeout(module.exports, BABYSITTER_DELAY);
 }
 
 // Kick off initial babysit task
-if (!DISABLE_BABYSITTER) {
+if (!BABYSITTER_DISABLED) {
   runBabysitAndReschedule();
 }
