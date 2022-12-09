@@ -1,8 +1,17 @@
-const { knex } = require("./knex");
 const _ = require("lodash");
 const url = require("url");
-
 const axios = require("axios").default;
+
+const { knex } = require("./knex");
+
+const CLUSTER_STATUS = {
+  ENABLED: "enabled",
+  DISABLED: "disabled",
+};
+
+const stateMap = {
+  FINISHED: "finished",
+};
 
 async function getClusterById(clusterId) {
   return knex("cluster").where({ id: clusterId }).first();
@@ -39,10 +48,6 @@ async function getSession(clusterId) {
   }
 }
 
-const stateMap = {
-  FINISHED: "finished",
-};
-
 async function getQueryStatus(clusterId, queryId) {
   // TODO cache these sessions somewhere and add in an auth check to handle expiration
   const session = await getSession(clusterId);
@@ -56,12 +61,11 @@ async function getQueryStatus(clusterId, queryId) {
       headers: { cookie: session },
     });
   } catch (err) {
-    if (_.get(err, "response.status") === 404) {
+    const responseStatus = _.get(err, "response.status");
+    if (responseStatus === 404 || responseStatus === 410) {
       return null;
     }
-    if (_.get(err, "response.status") === 410) {
-      return null;
-    }
+
     throw err;
   }
 
@@ -103,10 +107,13 @@ async function getQueryStatus(clusterId, queryId) {
   };
 }
 
-exports.getSession = getSession;
-exports.getQueryStatus = getQueryStatus;
-
 // TODO: make this really map to seconds
 function mapToSeconds(s) {
   return s;
 }
+
+module.exports = {
+  getSession,
+  getQueryStatus,
+  CLUSTER_STATUS,
+};
