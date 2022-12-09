@@ -47,7 +47,7 @@ async function runBabysitAndReschedule() {
   }
 
   // Reschdule task for the future
-  setTimeout(module.exports, BABYSITTER_DELAY);
+  setTimeout(runBabysitAndReschedule, BABYSITTER_DELAY);
 }
 
 // Kick off initial babysit task
