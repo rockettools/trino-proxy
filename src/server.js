@@ -9,7 +9,6 @@ const LISTEN_PORT = parseInt(process.env.LISTEN_PORT) || 8080;
 const HTTPS_LISTEN_PORT = parseInt(process.env.HTTPS_LISTEN_PORT) || 8443;
 const ENABLE_HTTP = process.env.ENABLE_HTTP === "true";
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
-const DISABLE_BABYSITTER = process.env.DISABLE_BABYSITTER === "true";
 
 const app = express();
 
@@ -32,6 +31,7 @@ app.use((req, res) => {
 // Add routes
 require("./routes/index")(app);
 
+// Setup server and start listening for requests
 if (ENABLE_HTTPS) {
   const credentials = {
     key: process.env.HTTPS_KEY,
@@ -46,6 +46,5 @@ if (!ENABLE_HTTPS || ENABLE_HTTP) {
   httpServer.listen(LISTEN_PORT);
 }
 
-if (!DISABLE_BABYSITTER) {
-  require("./babysitter")();
-}
+// Require babysitter last once server is setup and running successfully
+require("./babysitter");

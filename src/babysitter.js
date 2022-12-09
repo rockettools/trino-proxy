@@ -4,11 +4,12 @@ const { getQueryStatus } = require("./lib/cluster");
 const { knex } = require("./lib/knex");
 const logger = require("./lib/logger");
 
+const DISABLE_BABYSITTER = process.env.DISABLE_BABYSITTER === "true";
 const BABYSIT_DELAY = process.env.BABYSIT_DELAY
   ? parseInt(process.env.BABYSIT_DELAY)
   : 3000;
 
-async function babysit() {
+async function babysitQueries() {
   const currentQueries = await knex.raw(
     `select * from query where not status ilike any('{lost,finished,failed}')`
   );
@@ -38,12 +39,18 @@ async function babysit() {
   );
 }
 
-module.exports = async function () {
+async function runBabysitAndReschedule() {
   try {
-    await babysit();
+    await babysitQueries();
   } catch (err) {
     logger.error("Error babysitting", err);
   }
 
+  // Reschdule task for the future
   setTimeout(module.exports, BABYSIT_DELAY);
-};
+}
+
+// Kick off initial babysit task
+if (!DISABLE_BABYSITTER) {
+  runBabysitAndReschedule();
+}
