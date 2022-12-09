@@ -9,7 +9,8 @@ This project requires Node16+, Docker, and docker-compose. Please ensure you hav
 Build and run docker containers:
 
 ```sh
-make start
+make migrate    # create postgres db and run migrations
+make start      # run trino-proxy
 ```
 
 ## Contributing
@@ -18,10 +19,6 @@ Format and lint the source code:
 
 ```sh
 make format
-```
-
-```sh
-knex migrate:latest
 ```
 
 ## Configuration

@@ -15,6 +15,11 @@ format:
 start:
 	docker-compose up --build
 
+# Run database migrations against db
+migrate:
+	docker-compose up -d postgres
+	docker-compose run --build proxy /app/node_modules/.bin/knex migrate:latest
+
 # Cleanup all docker containers
 clean:
-	docker-compose down --rmi local --volumes
+	docker-compose down
