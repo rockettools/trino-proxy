@@ -3,6 +3,7 @@ const BPromise = require("bluebird");
 const { getQueryStatus } = require("./lib/cluster");
 const { knex } = require("./lib/knex");
 const logger = require("./lib/logger");
+const { QUERY_STATUS } = require("./lib/query");
 
 const BABYSITTER_DISABLED = process.env.BABYSITTER_DISABLED === "true";
 const BABYSITTER_DELAY = process.env.BABYSITTER_DELAY
@@ -25,7 +26,9 @@ async function babysitQueries() {
 
         // if not found, mark as lost
         if (status === null) {
-          await knex("query").where("id", query.id).update({ status: "lost" });
+          await knex("query")
+            .where("id", query.id)
+            .update({ status: QUERY_STATUS.LOST });
           return;
         }
 

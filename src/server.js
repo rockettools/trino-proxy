@@ -13,11 +13,6 @@ const HTTPS_LISTEN_PORT = parseInt(process.env.HTTPS_LISTEN_PORT) || 8443;
 
 const app = express();
 
-app.post("/v1/statement", function (req, res, next) {
-  req.headers["content-type"] = "text/plain";
-  next();
-});
-
 app.use(express.json()); // for parsing application/json
 app.use(express.text()); // for parsing plain/text
 
@@ -39,10 +34,7 @@ app.use("/", require("./routes/user"));
 
 // Fallback handler
 app.use("/", (req, res) => {
-  logger.debug(
-    "No matching route",
-    _.pick(req, ["url", "body", "params", "query", "rawHeaders"])
-  );
+  logger.debug("No matching route", _.pick(req, ["url", "body"]));
   return res.status(404).json({ error: "No matching route" });
 });
 

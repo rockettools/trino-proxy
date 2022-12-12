@@ -1,6 +1,14 @@
 const { knex } = require("./knex");
 const cache = require("./memcache");
 
+const QUERY_STATUS = {
+  AWAITING_SCHEDULING: "awaiting_scheduling",
+  FAILED: "failed",
+  FINISHED: "finished",
+  LOST: "lost",
+  QUEUED: "queued",
+};
+
 async function saveQueryIdMapping(queryId, newQueryId) {
   await knex("query")
     .where({ id: newQueryId })
@@ -24,7 +32,7 @@ async function getAssumedUserForTrace(traceId) {
     return cachedUser;
   }
 
-  const previousQuery = await exports.getFirstQueryByTraceId(traceId);
+  const previousQuery = await getQueryByTraceId(traceId);
   if (previousQuery) {
     return previousQuery.assumed_user || previousQuery.user;
   }
@@ -36,4 +44,5 @@ module.exports = {
   getQueryByTraceId,
   getQueryIdMapping,
   saveQueryIdMapping,
+  QUERY_STATUS,
 };

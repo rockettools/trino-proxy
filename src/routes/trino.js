@@ -6,90 +6,15 @@ const { updateUrls, replaceAuthorizationHeader } = require("../lib/helpers");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const cache = require("../lib/memcache");
-const { getQueryById, getAssumedUserForTrace } = require("../lib/query");
-const stats = require("../lib/stats");
+const {
+  getQueryById,
+  getAssumedUserForTrace,
+  QUERY_STATUS,
+} = require("../lib/query");
+
+const { scheduleQueries } = require("../lib/trino");
 
 const router = express.Router();
-let schedulerRunning = false;
-let runScheduler = false;
-
-async function scheduleQueries() {
-  logger.debug("Scheduling pending queries");
-  if (schedulerRunning) {
-    runScheduler = true;
-    return;
-  }
-  try {
-    const availableClusters = await knex("cluster").where({
-      status: "enabled",
-    });
-    if (availableClusters.length === 0) {
-      logger.debug("No clusters");
-      return;
-    }
-
-    let currentClusterId = Math.floor(Math.random() * availableClusters.length);
-
-    const queriesToSchedule = await knex("query").where({
-      status: "awaiting_scheduling",
-    });
-
-    stats.histogram("queries_waiting_scheduling", queriesToSchedule.length);
-
-    for (let idx = 0; idx < queriesToSchedule.length; idx++) {
-      const query = queriesToSchedule[idx];
-      const cluster = availableClusters[currentClusterId];
-      currentClusterId = (currentClusterId + 1) % availableClusters.length;
-      logger.debug(
-        "Submitting query: " +
-          query.id +
-          " " +
-          cluster.url +
-          " to: " +
-          currentClusterId
-      );
-      await axios({
-        url: cluster.url + "/v1/statement",
-        method: "post",
-        headers: {
-          "X-Trino-User": query.assumed_user,
-          "X-Trino-Source": "trino-proxy",
-        },
-        data: query.body,
-      }).then(async function (response) {
-        const nextURI = response.data.nextUri.split(response.data.id + "/")[1];
-
-        await knex("query").where({ id: query.id }).update({
-          cluster_query_id: response.data.id,
-          cluster_id: cluster.id,
-          status: "queued",
-          next_uri: nextURI,
-        });
-      });
-    }
-  } catch (err) {
-    logger.error("ERROR", err);
-  } finally {
-    schedulerRunning = false;
-
-    if (runScheduler) {
-      runScheduler = false;
-      scheduleQueries();
-    }
-  }
-}
-
-async function runScheduledScheduleQueries() {
-  try {
-    await scheduleQueries();
-  } catch (err) {
-    logger.error("Error scheduling queries", err);
-  }
-
-  setTimeout(runScheduledScheduleQueries, 10000);
-}
-
-setTimeout(runScheduledScheduleQueries, 10000);
 
 function getHost(req) {
   return (
@@ -102,26 +27,23 @@ function getHost(req) {
 }
 
 router.post("/v1/statement", async (req, res) => {
+  // Set content-type for incoming request
+  req.headers["content-type"] = "text/plain";
+
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  logger.debug("Submitting Statement");
-  if (process.env.LOG_QUERY) {
-    logger.debug("Submitting Query: " + req.body);
-  }
+  logger.debug("Submitting statement", {
+    user: req.user,
+    query: process.env.LOG_QUERY ? req.body : "",
+  });
 
   // TODO the assumedUser/real user pair should probably be locked for the trace set
   let assumedUser;
 
-  // It doesn't seem trivial to pass groups through to the current version
-  // of trino. They seem to be associated to configured users which wont work
-  // for our dynamic user assumption.
-  // let assumedGroups = [];
-
-  let trinoTraceToken = null;
-  if (req.headers["x-trino-trace-token"]) {
-    trinoTraceToken = req.headers["x-trino-trace-token"];
+  const trinoTraceToken = req.headers["x-trino-trace-token"] || null;
+  if (trinoTraceToken) {
     const info = await getAssumedUserForTrace(trinoTraceToken);
     logger.debug("Trace and already assumed user: " + trinoTraceToken, info);
 
@@ -150,7 +72,7 @@ router.post("/v1/statement", async (req, res) => {
 
   await knex("query").insert({
     id: newQueryId,
-    status: "awaiting_scheduling",
+    status: QUERY_STATUS.AWAITING_SCHEDULING,
     body: req.body,
     trace_id: trinoTraceToken,
     assumed_user: assumedUser,
@@ -198,7 +120,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
     });
   }
 
-  if (query.status === "awaiting_scheduling") {
+  if (query.status === QUERY_STATUS.AWAITING_SCHEDULING) {
     // TODO retur
     return res.json(
       updateUrls(
