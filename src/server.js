@@ -35,7 +35,7 @@ app.use("/", require("./routes/user"));
 // Fallback handler
 app.use("/", (req, res) => {
   logger.debug("No matching route", _.pick(req, ["url", "body"]));
-  return res.status(404).json({ error: "No matching route" });
+  return res.send("Hello Trino!");
 });
 
 // Setup server and start listening for requests
