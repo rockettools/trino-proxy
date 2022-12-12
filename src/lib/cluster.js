@@ -35,7 +35,6 @@ async function getSession(clusterId) {
     });
   } catch (err) {
     const setCookies = _.get(err, ["response", "headers", "set-cookie"]);
-    console.log(setCookies);
     if (setCookies && setCookies.length > 0) {
       for (let idx = 0; idx < setCookies.length; idx++) {
         // This should be configurable based on the detected Trino version

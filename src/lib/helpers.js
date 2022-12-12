@@ -1,3 +1,4 @@
+const logger = require("./logger");
 const { getAssumedUserForTrace } = require("./query");
 
 function updateUrls(body, newQueryId, host) {
@@ -38,7 +39,7 @@ async function replaceAuthorizationHeader(req) {
   }
 
   if (headerUser) {
-    console.log("Replacing with: " + headerUser);
+    logger.debug("Replacing authorization header", { headerUser });
     req.headers.authorization =
       "Basic " + Buffer.from(headerUser).toString("base64");
   }

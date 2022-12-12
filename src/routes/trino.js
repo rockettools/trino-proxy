@@ -165,43 +165,34 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
   const cluster = await knex("cluster").where({ id: query.cluster_id }).first();
 
   await replaceAuthorizationHeader(req);
-  axios({
-    url:
-      cluster.url +
-      "/v1/statement/queued/" +
-      query.cluster_query_id +
-      "/" +
-      req.params.keyId +
-      "/" +
-      req.params.num,
-    method: "get",
-    headers: req.headers,
-  })
-    .then(function (response) {
-      const newBody = updateUrls(
-        response.data,
-        req.params.queryId,
-        getHost(req)
-      );
 
-      res.json(newBody);
-    })
-    .catch(function (err) {
-      if (err.response && err.response.status === 404) {
-        console.log(
-          "Query not found: " +
-            query.cluster_query_id +
-            "/" +
-            req.params.keyId +
-            "/" +
-            req.params.num
-        );
-        return res.status(404).json({ error: "Query not found" });
-      }
-
-      // TODO: why are killing the server here?
-      process.exit(1);
+  try {
+    const response = await axios({
+      url:
+        cluster.url +
+        "/v1/statement/queued/" +
+        query.cluster_query_id +
+        "/" +
+        req.params.keyId +
+        "/" +
+        req.params.num,
+      method: "get",
+      headers: req.headers,
     });
+
+    const newBody = updateUrls(response.data, req.params.queryId, getHost(req));
+    return res.json(newBody);
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      logger.error("Query not found", {
+        queryId: query.cluster_query_id,
+        keyId: req.params.keyId,
+        num: req.params.num,
+      });
+
+      return res.status(404).json({ error: "Query not found" });
+    }
+  }
 });
 
 router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
@@ -211,7 +202,7 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
   // If we are unable to find the queryMapping we're in trouble, fail the query.
   if (!query) {
     return res.status(404).json({
-      error: "Query not found.",
+      error: "Query not found",
     });
   }
 
@@ -219,42 +210,33 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
 
   await replaceAuthorizationHeader(req);
 
-  axios({
-    url:
-      cluster.url +
-      "/v1/statement/executing/" +
-      query.cluster_query_id +
-      "/" +
-      req.params.keyId +
-      "/" +
-      req.params.num,
-    method: "get",
-    headers: req.headers,
-  })
-    .then(function (response) {
-      const newBody = updateUrls(
-        response.data,
-        req.params.queryId,
-        getHost(req)
-      );
-      res.json(newBody);
-    })
-    .catch(function (err) {
-      if (err.response && err.response.status === 404) {
-        console.log(
-          "Query not found when executing: " +
-            query.cluster_query_id +
-            "/" +
-            req.params.keyId +
-            "/" +
-            req.params.num
-        );
-        return res.status(404).json({ error: "Query not found" });
-      }
-
-      // TODO: why are killing the server here?
-      process.exit(1);
+  try {
+    const response = axios({
+      url:
+        cluster.url +
+        "/v1/statement/executing/" +
+        query.cluster_query_id +
+        "/" +
+        req.params.keyId +
+        "/" +
+        req.params.num,
+      method: "get",
+      headers: req.headers,
     });
+
+    const newBody = updateUrls(response.data, req.params.queryId, getHost(req));
+    res.json(newBody);
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      logger.error("Query not found when executing", {
+        queryId: query.cluster_query_id,
+        keyId: req.params.keyId,
+        num: req.params.num,
+      });
+
+      return res.status(404).json({ error: "Query not found" });
+    }
+  }
 });
 
 module.exports = router;
