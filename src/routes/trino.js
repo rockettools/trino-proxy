@@ -211,7 +211,7 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
   await replaceAuthorizationHeader(req);
 
   try {
-    const response = axios({
+    const response = await axios({
       url:
         cluster.url +
         "/v1/statement/executing/" +
