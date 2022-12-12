@@ -1,35 +1,40 @@
 const { knex } = require("./knex");
 const cache = require("./memcache");
 
-exports.saveQueryIdMapping = async function saveQueryIdMapping(
-  queryId,
-  newQueryId
-) {
-  await knex("query")
-    .where({ id: newQueryId })
-    .update({ cluster_query_id: queryId });
+const QUERY_STATUS = {
+  AWAITING_SCHEDULING: "awaiting_scheduling",
+  FAILED: "failed",
+  FINISHED: "finished",
+  LOST: "lost",
+  QUEUED: "queued",
 };
 
-exports.getQueryById = async function getQueryIdMapping(newQueryId) {
+async function getQueryById(newQueryId) {
   return knex("query").where({ id: newQueryId }).first();
-};
+}
 
-exports.getFirstQueryByTraceId = async function getQueryByTraceId(traceId) {
+async function getFirstQueryByTraceId(traceId) {
   return knex("query")
     .where({ trace_id: traceId })
     .orderBy("created_at", "asc")
     .first();
-};
+}
 
-exports.getAssumedUserForTrace = async function (traceId) {
+async function getAssumedUserForTrace(traceId) {
   const cachedUser = await cache.get(traceId);
   if (cachedUser) {
     return cachedUser;
   }
 
-  const previousQuery = await exports.getFirstQueryByTraceId(traceId);
+  const previousQuery = await getFirstQueryByTraceId(traceId);
   if (previousQuery) {
     return previousQuery.assumed_user || previousQuery.user;
   }
   return null;
+}
+
+module.exports = {
+  getAssumedUserForTrace,
+  getQueryById,
+  QUERY_STATUS,
 };

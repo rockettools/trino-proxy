@@ -1,9 +1,16 @@
-const logger = require("./lib/logger");
-const { knex } = require("./lib/knex");
 const BPromise = require("bluebird");
-const { getQueryStatus } = require("./lib/cluster");
 
-async function babysit() {
+const { getQueryStatus } = require("./lib/cluster");
+const { knex } = require("./lib/knex");
+const logger = require("./lib/logger");
+const { QUERY_STATUS } = require("./lib/query");
+
+const BABYSITTER_DISABLED = process.env.BABYSITTER_DISABLED === "true";
+const BABYSITTER_DELAY = process.env.BABYSITTER_DELAY
+  ? parseInt(process.env.BABYSITTER_DELAY)
+  : 3000;
+
+async function babysitQueries() {
   const currentQueries = await knex.raw(
     `select * from query where not status ilike any('{lost,finished,failed}')`
   );
@@ -16,11 +23,12 @@ async function babysit() {
           query.cluster_id,
           query.cluster_query_id
         );
-        console.log(status);
 
         // if not found, mark as lost
         if (status === null) {
-          await knex("query").where("id", query.id).update({ status: "lost" });
+          await knex("query")
+            .where("id", query.id)
+            .update({ status: QUERY_STATUS.LOST });
           return;
         }
 
@@ -34,15 +42,18 @@ async function babysit() {
   );
 }
 
-module.exports = async function () {
+async function runBabysitAndReschedule() {
   try {
-    await babysit();
+    await babysitQueries();
   } catch (err) {
     logger.error("Error babysitting", err);
   }
 
-  setTimeout(
-    module.exports,
-    process.env.BABYSIT_DELAY ? parseInt(process.env.BABYSIT_DELAY) : 3000
-  );
-};
+  // Reschdule task for the future
+  setTimeout(runBabysitAndReschedule, BABYSITTER_DELAY);
+}
+
+// Kick off initial babysit task
+if (!BABYSITTER_DISABLED) {
+  runBabysitAndReschedule();
+}

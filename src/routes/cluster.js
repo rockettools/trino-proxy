@@ -1,59 +1,74 @@
-const { knex } = require("../lib/knex");
 const uuidv4 = require("uuid").v4;
-const _ = require("lodash");
+const zod = require("zod");
+const express = require("express");
 
-module.exports = function (app) {
-  app.get("/v1/cluster", async function (req, res) {
-    const clusters = await knex("cluster");
-    res.json({
-      items: clusters.map(function (cluster) {
-        return {
-          id: cluster.id,
-          name: cluster.name,
-          status: cluster.status,
-        };
-      }),
-    });
+const { knex } = require("../lib/knex");
+const { CLUSTER_STATUS } = require("../lib/cluster");
+
+const router = express.Router();
+
+router.get("/v1/cluster", async function (req, res) {
+  const clusters = await knex("cluster");
+  const items = clusters.map((cluster) => ({
+    id: cluster.id,
+    name: cluster.name,
+    url: cluster.url,
+    status: cluster.status,
+  }));
+
+  return res.status(200).json({ clusters: items });
+});
+
+router.post("/v1/cluster", async function (req, res) {
+  const times = new Date();
+  const newCluster = zod
+    .object({
+      name: zod.string(),
+      url: zod.string(),
+      status: zod.nativeEnum(CLUSTER_STATUS),
+    })
+    .strict() // don't allow extra keys
+    .safeParse(req.body);
+
+  if (!newCluster.success) {
+    return res.status(400).json({ error: newCluster.error });
+  }
+
+  const clusterId = uuidv4();
+  await knex("cluster").insert({
+    ...newCluster.data,
+    id: clusterId,
+    created_at: times,
+    updated_at: times,
   });
 
-  app.post("/v1/cluster", async function (req, res) {
-    const times = new Date();
-    await knex("cluster").insert({
-      id: uuidv4(),
-      name: req.body.name,
-      url: req.body.url,
-      created_at: times,
-      updated_at: times,
-      status: req.body.status || "enabled",
-    });
-    const clusters = await knex("cluster");
-    res.json({
-      items: clusters.map(function (cluster) {
-        return {
-          id: cluster.id,
-          name: cluster.name,
-          status: cluster.status,
-        };
-      }),
-    });
-  });
+  res.status(201).json({ id: clusterId });
+});
 
-  app.patch("/v1/cluster/:clusterId", async function (req, res) {
-    const cluster = await knex("cluster")
-      .where({ id: req.params.clusterId })
-      .first();
-    if (!cluster) {
-      return res.status(404).send("Not found");
-    }
+router.patch("/v1/cluster/:clusterId", async function (req, res) {
+  const clusterId = zod.string().uuid().parse(req.params.clusterId);
+  const cluster = await knex("cluster").where({ id: clusterId }).first();
+  if (!cluster) {
+    return res.status(404).json({ error: "Not found" });
+  }
 
-    await knex("cluster")
-      .where({ id: req.params.clusterId })
-      .update(
-        _.merge(_.pick(req.body, "status", "name"), { updated_at: new Date() })
-      );
+  const clusterUpdate = zod
+    .object({
+      name: zod.string(),
+      status: zod.nativeEnum(CLUSTER_STATUS),
+      url: zod.string(),
+    })
+    .strict() // don't allow extra keys
+    .safeParse(req.body);
+  if (!clusterUpdate.success) {
+    return res.status(400).json({ error: clusterUpdate.error });
+  }
 
-    res.json({
-      status: "done",
-    });
-  });
-};
+  await knex("cluster")
+    .where({ id: clusterId })
+    .update({ ...clusterUpdate.data, updated_at: new Date() });
+
+  return res.status(200).json({ id: clusterId });
+});
+
+module.exports = router;

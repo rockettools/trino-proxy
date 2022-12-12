@@ -9,6 +9,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules /app/node_modules
 COPY src /app/src
 COPY migrations /app/migrations
+COPY package.json knexfile.js /app/
 
 EXPOSE 8080
 CMD ["/app/src/server.js"]
