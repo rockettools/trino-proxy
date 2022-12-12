@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get("/v1/user", async function (req, res) {
   const users = await knex("user");
-  res.json({
+  return res.json({
     items: users.map(function (user) {
       return { id: user.id, name: user.name };
     }),
@@ -58,7 +58,7 @@ router.post("/v1/user", async function (req, res) {
     created_at: new Date(),
   });
 
-  res.json({ id: userId });
+  return res.json({ id: userId });
 });
 
 router.patch("/v1/user/:userId", async function (req, res) {
@@ -92,7 +92,7 @@ router.patch("/v1/user/:userId", async function (req, res) {
       })
     );
 
-  res.json({ status: "updated" });
+  return res.json({ status: "updated" });
 });
 
 module.exports = router;

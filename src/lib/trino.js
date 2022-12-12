@@ -21,7 +21,7 @@ async function scheduleQueries() {
       status: CLUSTER_STATUS.ENABLED,
     });
     if (availableClusters.length === 0) {
-      logger.debug("No clusters");
+      logger.error("No clusters");
       return;
     }
 

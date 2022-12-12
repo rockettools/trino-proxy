@@ -45,7 +45,7 @@ router.post("/v1/statement", async (req, res) => {
   const trinoTraceToken = req.headers["x-trino-trace-token"] || null;
   if (trinoTraceToken) {
     const info = await getAssumedUserForTrace(trinoTraceToken);
-    logger.debug("Trace and already assumed user: " + trinoTraceToken, info);
+    logger.debug("Trace and already assumed user", { trinoTraceToken, info });
 
     // If this is the first query in the sequence it should have the header, try and parse.
     if (!info) {
@@ -103,14 +103,12 @@ router.post("/v1/statement", async (req, res) => {
 });
 
 router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
-  logger.debug(
-    "Statement fetching status for query: " +
-      req.params.queryId +
-      " key: " +
-      req.params.keyId +
-      " num: " +
-      req.params.num
-  );
+  logger.debug("Fetching statement status: queued", {
+    queryId: req.params.queryId,
+    keyId: req.params.keyId,
+    num: req.params.num,
+  });
+
   const query = await getQueryById(req.params.queryId);
 
   // If we are unable to find the queryMapping we're in trouble, fail the query.
@@ -196,7 +194,11 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
 });
 
 router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
-  logger.debug("Statement fetching status 2", {});
+  logger.debug("Fetching statement status: executing", {
+    queryId: req.params.queryId,
+    keyId: req.params.keyId,
+    num: req.params.num,
+  });
 
   const query = await getQueryById(req.params.queryId);
   // If we are unable to find the queryMapping we're in trouble, fail the query.
@@ -225,7 +227,7 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
     });
 
     const newBody = updateUrls(response.data, req.params.queryId, getHost(req));
-    res.json(newBody);
+    return res.json(newBody);
   } catch (err) {
     if (err.response && err.response.status === 404) {
       logger.error("Query not found when executing", {
