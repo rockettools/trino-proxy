@@ -9,17 +9,11 @@ const QUERY_STATUS = {
   QUEUED: "queued",
 };
 
-async function saveQueryIdMapping(queryId, newQueryId) {
-  await knex("query")
-    .where({ id: newQueryId })
-    .update({ cluster_query_id: queryId });
-}
-
-async function getQueryIdMapping(newQueryId) {
+async function getQueryById(newQueryId) {
   return knex("query").where({ id: newQueryId }).first();
 }
 
-async function getQueryByTraceId(traceId) {
+async function getFirstQueryByTraceId(traceId) {
   return knex("query")
     .where({ trace_id: traceId })
     .orderBy("created_at", "asc")
@@ -32,7 +26,7 @@ async function getAssumedUserForTrace(traceId) {
     return cachedUser;
   }
 
-  const previousQuery = await getQueryByTraceId(traceId);
+  const previousQuery = await getFirstQueryByTraceId(traceId);
   if (previousQuery) {
     return previousQuery.assumed_user || previousQuery.user;
   }
@@ -41,8 +35,6 @@ async function getAssumedUserForTrace(traceId) {
 
 module.exports = {
   getAssumedUserForTrace,
-  getQueryByTraceId,
-  getQueryIdMapping,
-  saveQueryIdMapping,
+  getQueryById,
   QUERY_STATUS,
 };
