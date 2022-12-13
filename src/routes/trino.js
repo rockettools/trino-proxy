@@ -26,10 +26,13 @@ function getHost(req) {
   );
 }
 
-router.post("/v1/statement", async (req, res) => {
+router.post("/v1/statement", (req, res, next) => {
   // Set content-type for incoming request
   req.headers["content-type"] = "text/plain";
+  next();
+});
 
+router.post("/v1/statement", async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
