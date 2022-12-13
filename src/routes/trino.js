@@ -26,7 +26,7 @@ function getHost(req) {
   );
 }
 
-router.post("/v1/statement", (req, res, next) => {
+router.use("/v1/statement", (req, res, next) => {
   // Set content-type for incoming request
   req.headers["content-type"] = "text/plain";
   next();
