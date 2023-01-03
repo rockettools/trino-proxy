@@ -21,7 +21,7 @@ async function scheduleQueries() {
       status: CLUSTER_STATUS.ENABLED,
     });
     if (availableClusters.length === 0) {
-      logger.error("No clusters");
+      logger.error("No enabled clusters available");
       return;
     }
 
@@ -40,6 +40,8 @@ async function scheduleQueries() {
       logger.debug("Submitting query", {
         id: query.id,
         url: cluster.url,
+        user: query.assumed_user,
+        source: query.source,
         currentClusterId,
       });
 
@@ -48,7 +50,7 @@ async function scheduleQueries() {
         method: "post",
         headers: {
           "X-Trino-User": query.assumed_user,
-          "X-Trino-Source": "trino-proxy",
+          "X-Trino-Source": query.source || "trino-proxy",
         },
         data: query.body,
       });
