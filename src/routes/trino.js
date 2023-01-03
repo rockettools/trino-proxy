@@ -38,7 +38,6 @@ router.post("/v1/statement", async (req, res) => {
 
   // TODO the assumedUser/real user pair should probably be locked for the trace set
   let assumedUser;
-
   const trinoTraceToken = req.headers["x-trino-trace-token"] || null;
   if (trinoTraceToken) {
     const info = await getAssumedUserForTrace(trinoTraceToken);
@@ -66,6 +65,7 @@ router.post("/v1/statement", async (req, res) => {
 
   const newQueryId = uuidv4();
   const times = new Date();
+  const querySource = req.headers["x-trino-source"] || null;
 
   await knex("query").insert({
     id: newQueryId,
@@ -73,6 +73,7 @@ router.post("/v1/statement", async (req, res) => {
     body: req.body,
     trace_id: trinoTraceToken,
     assumed_user: assumedUser,
+    source: querySource,
     user: req.user ? req.user.id : null,
     created_at: times,
     updated_at: times,
@@ -90,7 +91,7 @@ router.post("/v1/statement", async (req, res) => {
           newQueryId +
           "/mock_next_uri/1",
         stats: {
-          state: "QUEUED",
+          state: QUERY_STATUS.QUEUED,
         },
       },
       newQueryId,
@@ -111,7 +112,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
   // If we are unable to find the queryMapping we're in trouble, fail the query.
   if (!query) {
     return res.status(404).json({
-      error: "Query not found.",
+      error: "Query not found",
     });
   }
 
@@ -127,7 +128,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
             query.id +
             "/mock_next_uri/1",
           stats: {
-            state: "QUEUED",
+            state: QUERY_STATUS.QUEUED,
           },
         },
         query.id,
@@ -148,7 +149,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
             "/" +
             query.next_uri,
           stats: {
-            state: "QUEUED",
+            state: QUERY_STATUS.QUEUED,
           },
         },
         query.id,
