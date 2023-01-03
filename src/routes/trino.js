@@ -27,9 +27,6 @@ function getHost(req) {
 }
 
 router.post("/v1/statement", async (req, res) => {
-  // Set content-type for incoming request
-  req.headers["content-type"] = "text/plain";
-
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized" });
   }

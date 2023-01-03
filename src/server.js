@@ -13,6 +13,12 @@ const HTTPS_LISTEN_PORT = parseInt(process.env.HTTPS_LISTEN_PORT) || 8443;
 
 const app = express();
 
+// Set content-type for incoming statement requests before parsing middleware is applied
+app.post("/v1/statement", (req, res, next) => {
+  req.headers["content-type"] = "text/plain";
+  next();
+});
+
 app.use(express.json()); // for parsing application/json
 app.use(express.text()); // for parsing plain/text
 
