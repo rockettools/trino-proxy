@@ -10,29 +10,32 @@ let schedulerRunning = false;
 let runScheduler = false;
 
 async function scheduleQueries() {
-  logger.debug("Scheduling pending queries");
+  const startTime = new Date();
   if (schedulerRunning) {
     runScheduler = true;
     return;
   }
 
   try {
-    const availableClusters = await knex("cluster").where({
-      status: CLUSTER_STATUS.ENABLED,
+    logger.info("Scheduling pending queries");
+    const [availableClusters, queriesToSchedule] = await Promise.all([
+      knex("cluster").where({ status: CLUSTER_STATUS.ENABLED }),
+      knex("query").where({ status: QUERY_STATUS.AWAITING_SCHEDULING }),
+    ]);
+
+    stats.histogram("available_clusters", availableClusters.length);
+    stats.histogram("queries_waiting_scheduling", queriesToSchedule.length);
+    logger.debug("Queries awaiting scheduling", {
+      queries: queriesToSchedule.length,
+      clusters: availableClusters.length,
     });
+
     if (availableClusters.length === 0) {
-      logger.error("No clusters");
+      logger.error("No enabled clusters available");
       return;
     }
 
     let currentClusterId = Math.floor(Math.random() * availableClusters.length);
-
-    const queriesToSchedule = await knex("query").where({
-      status: QUERY_STATUS.AWAITING_SCHEDULING,
-    });
-
-    stats.histogram("queries_waiting_scheduling", queriesToSchedule.length);
-
     for (let idx = 0; idx < queriesToSchedule.length; idx++) {
       const query = queriesToSchedule[idx];
       const cluster = availableClusters[currentClusterId];
@@ -59,6 +62,7 @@ async function scheduleQueries() {
         data: query.body,
       });
 
+      logger.debug("Trino cluster response", { data: response.data });
       const nextURI = response.data.nextUri.split(response.data.id + "/")[1];
       await knex("query").where({ id: query.id }).update({
         cluster_query_id: response.data.id,
@@ -70,8 +74,8 @@ async function scheduleQueries() {
   } catch (err) {
     logger.error("Error scheduling queries", err);
   } finally {
+    stats.timing("scheduler.timing", new Date() - startTime);
     schedulerRunning = false;
-
     if (runScheduler) {
       runScheduler = false;
       scheduleQueries();
@@ -80,12 +84,7 @@ async function scheduleQueries() {
 }
 
 async function runScheduledScheduleQueries() {
-  try {
-    await scheduleQueries();
-  } catch (err) {
-    logger.error("Error scheduling queries", err);
-  }
-
+  await scheduleQueries();
   setTimeout(runScheduledScheduleQueries, 10000);
 }
 
