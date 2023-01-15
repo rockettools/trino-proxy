@@ -3,18 +3,20 @@ version: "3.7"
 services:
   proxy:
     build: .
-    container_name: trino-proxy
     restart: always
     volumes:
+      - ./migrations:/app/migrations
+      - ./seeds:/app/seeds
       - ./src:/app/src
     ports:
       - 8080:8080
     depends_on:
       - postgres
     environment:
+      - DB_URL=postgres://trino_proxy:trino_proxy@postgres/trino_proxy
+      - HTTP_ENABLED=true
       - LOG_LEVEL=debug
       - NODE_ENV=production
-      - DB_URL=postgres://trino_proxy:trino_proxy@postgres/trino_proxy
 
   postgres:
     image: postgres:13
@@ -23,3 +25,9 @@ services:
       POSTGRES_USER: trino_proxy
       POSTGRES_PASSWORD: trino_proxy
       POSTGRES_DB: trino_proxy
+
+  trino:
+    image: trinodb/trino
+    restart: always
+    ports:
+      - 8081:8080
