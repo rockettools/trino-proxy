@@ -21,6 +21,16 @@ brew install trino
 trino --server http://localhost:8080 --user admin
 ```
 
+Creating a new user via API:
+
+```sh
+curl \
+    --request POST \
+    --user "admin" \
+    --json '{ "username": "test", "password": "", "tags": ["test"] }' \
+    http://localhost:8080/v1/user
+```
+
 ## Contributing
 
 Format and lint the source code:

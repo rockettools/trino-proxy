@@ -12,6 +12,7 @@ exports.seed = async function (knex) {
     name: "admin",
     password: "{}", // no password
     parsers: null,
+    tags: "{admin}",
     updated_at: now,
     created_at: now,
   });

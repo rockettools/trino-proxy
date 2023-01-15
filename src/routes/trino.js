@@ -66,6 +66,7 @@ router.post("/v1/statement", async (req, res) => {
 
   const newQueryId = uuidv4();
   const times = new Date();
+  const querySource = req.headers["x-trino-source"] || null;
 
   await knex("query").insert({
     id: newQueryId,
@@ -73,7 +74,9 @@ router.post("/v1/statement", async (req, res) => {
     body: req.body,
     trace_id: trinoTraceToken,
     assumed_user: assumedUser,
-    user: req.user ? req.user.id : null,
+    source: querySource,
+    tags: req.user.tags || [],
+    user: req.user.id || null,
     created_at: times,
     updated_at: times,
   });
@@ -90,7 +93,7 @@ router.post("/v1/statement", async (req, res) => {
           newQueryId +
           "/mock_next_uri/1",
         stats: {
-          state: "QUEUED",
+          state: QUERY_STATUS.QUEUED,
         },
       },
       newQueryId,
@@ -127,7 +130,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
             query.id +
             "/mock_next_uri/1",
           stats: {
-            state: "QUEUED",
+            state: QUERY_STATUS.QUEUED,
           },
         },
         query.id,
@@ -148,7 +151,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
             "/" +
             query.next_uri,
           stats: {
-            state: "QUEUED",
+            state: QUERY_STATUS.QUEUED,
           },
         },
         query.id,

@@ -40,15 +40,21 @@ async function scheduleQueries() {
       logger.debug("Submitting query", {
         id: query.id,
         url: cluster.url,
+        user: query.assumed_user,
+        source: query.source,
         currentClusterId,
       });
+
+      const userTags = Array.isArray(query.tags) ? query.tags : [];
+      const clientTags = userTags.concat("trino-proxy");
 
       const response = await axios({
         url: cluster.url + "/v1/statement",
         method: "post",
         headers: {
           "X-Trino-User": query.assumed_user,
-          "X-Trino-Source": "trino-proxy",
+          "X-Trino-Source": query.source || "trino-proxy",
+          "X-Trino-Client-Tags": clientTags.join(","),
         },
         data: query.body,
       });
