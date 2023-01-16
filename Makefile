@@ -19,6 +19,7 @@ start:
 migrate:
 	docker-compose up -d postgres
 	docker-compose run --build proxy /app/node_modules/.bin/knex migrate:latest
+	docker-compose run --build proxy /app/node_modules/.bin/knex seed:run
 
 # Cleanup all docker containers
 clean:

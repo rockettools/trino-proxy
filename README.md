@@ -9,8 +9,16 @@ This project requires Node16+, Docker, and docker-compose. Please ensure you hav
 Build and run docker containers:
 
 ```sh
-make migrate    # create postgres db and run migrations
+make clean      # remove all existing containers
+make migrate    # create postgres db, run migrations, and seed data
 make start      # run trino-proxy
+```
+
+In another shell, you can use the Trino CLI to execute commands against the cluster (via trino-proxy):
+
+```sh
+brew install trino
+trino --server http://localhost:8080 --user admin
 ```
 
 ## Contributing
