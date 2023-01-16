@@ -1,7 +1,8 @@
+const _ = require("lodash");
 const express = require("express");
 const uuidv4 = require("uuid").v4;
-const axios = require("axios").default;
 
+const { axios } = require("../lib/axios");
 const { updateUrls, replaceAuthorizationHeader } = require("../lib/helpers");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
@@ -17,13 +18,12 @@ const { scheduleQueries } = require("../lib/trino");
 const router = express.Router();
 
 function getHost(req) {
-  return (
-    (req.headers["x-forwarded-proto"]
-      ? req.headers["x-forwarded-proto"] // TODO make sure this is only http or https
-      : req.protocol) +
-    "://" +
-    req.get("host")
-  );
+  const host = req.get("host");
+  const protocol = req.headers["x-forwarded-proto"]
+    ? req.headers["x-forwarded-proto"] // TODO make sure this is only http or https
+    : req.protocol;
+
+  return `${protocol}://${host}`;
 }
 
 router.post("/v1/statement", async (req, res) => {
@@ -42,7 +42,7 @@ router.post("/v1/statement", async (req, res) => {
     const trinoTraceToken = req.headers["x-trino-trace-token"] || null;
     if (trinoTraceToken) {
       const info = await getAssumedUserForTrace(trinoTraceToken);
-      logger.debug("Trace and already assumed user", { trinoTraceToken, info });
+      logger.silly("Trace and already assumed user", { trinoTraceToken, info });
 
       // If this is the first query in the sequence it should have the header, try and parse.
       if (!info) {
@@ -108,25 +108,19 @@ router.post("/v1/statement", async (req, res) => {
 });
 
 router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
-  logger.debug("Fetching statement status: queued", {
-    queryId: req.params.queryId,
-    keyId: req.params.keyId,
-    num: req.params.num,
-  });
+  const { queryId, keyId, num } = req.params;
+  logger.debug("Fetching statement status: queued", { queryId, keyId, num });
 
   try {
-    const query = await getQueryById(req.params.queryId);
+    const query = await getQueryById(queryId);
 
     // If we are unable to find the queryMapping we're in trouble, fail the query.
     if (!query) {
-      return res.status(404).json({
-        error: "Query not found",
-      });
+      return res.status(404).json({ error: "Query not found" });
     }
 
     if (query.status === QUERY_STATUS.AWAITING_SCHEDULING) {
-      // TODO retur
-      return res.json(
+      return res.status(200).json(
         updateUrls(
           {
             id: query.id,
@@ -145,8 +139,8 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
       );
     }
 
-    if (req.params.keyId === "mock_next_uri") {
-      return res.json(
+    if (keyId === "mock_next_uri") {
+      return res.status(200).json(
         updateUrls(
           {
             id: query.id,
@@ -179,26 +173,35 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
           "/v1/statement/queued/" +
           query.cluster_query_id +
           "/" +
-          req.params.keyId +
+          keyId +
           "/" +
-          req.params.num,
+          num,
         method: "get",
         headers: req.headers,
       });
 
-      const newBody = updateUrls(
-        response.data,
-        req.params.queryId,
-        getHost(req)
-      );
+      // If state changed, update in database
+      const newState = _.get(response, "data.stats.state");
+      if (newState && newState !== query.status) {
+        await knex("query")
+          .where("id", query.id)
+          .update({ status: newState, updated_at: new Date() });
+      }
+
+      const newBody = updateUrls(response.data, queryId, getHost(req));
       return res.status(200).json(newBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
-        logger.error("Query not found", {
-          queryId: query.cluster_query_id,
-          keyId: req.params.keyId,
-          num: req.params.num,
+        logger.error("Query not found (statement queued)", {
+          clusterId: query.cluster_query_id,
+          queryId,
+          keyId,
+          num,
         });
+
+        await knex("query")
+          .where("id", query.id)
+          .update({ status: QUERY_STATUS.LOST, updated_at: new Date() });
 
         return res.status(404).json({ error: "Query not found" });
       }
@@ -210,14 +213,11 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
 });
 
 router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
-  logger.debug("Fetching statement status: executing", {
-    queryId: req.params.queryId,
-    keyId: req.params.keyId,
-    num: req.params.num,
-  });
+  const { queryId, keyId, num } = req.params;
+  logger.debug("Fetching statement status: executing", { queryId, keyId, num });
 
   try {
-    const query = await getQueryById(req.params.queryId);
+    const query = await getQueryById(queryId);
     // If we are unable to find the queryMapping we're in trouble, fail the query.
     if (!query) {
       return res.status(404).json({
@@ -238,26 +238,35 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
           "/v1/statement/executing/" +
           query.cluster_query_id +
           "/" +
-          req.params.keyId +
+          keyId +
           "/" +
-          req.params.num,
+          num,
         method: "get",
         headers: req.headers,
       });
 
-      const newBody = updateUrls(
-        response.data,
-        req.params.queryId,
-        getHost(req)
-      );
+      // If state changed, update in database
+      const newState = _.get(response, "data.stats.state");
+      if (newState && newState !== query.status) {
+        await knex("query")
+          .where("id", query.id)
+          .update({ status: newState, updated_at: new Date() });
+      }
+
+      const newBody = updateUrls(response.data, queryId, getHost(req));
       return res.status(200).json(newBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
-        logger.error("Query not found when executing", {
-          queryId: query.cluster_query_id,
-          keyId: req.params.keyId,
-          num: req.params.num,
+        logger.error("Query not found (statement executing)", {
+          clusterId: query.cluster_query_id,
+          queryId,
+          keyId,
+          num,
         });
+
+        await knex("query")
+          .where("id", query.id)
+          .update({ status: QUERY_STATUS.LOST, updated_at: new Date() });
 
         return res.status(404).json({ error: "Query not found" });
       }

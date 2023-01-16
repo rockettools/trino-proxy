@@ -4,6 +4,7 @@ const http = require("http");
 const https = require("https");
 
 const logger = require("./lib/logger");
+const stats = require("./lib/stats");
 const authenticationMiddleware = require("./middlewares/authentication");
 
 const HTTP_ENABLED = process.env.HTTP_ENABLED === "true";
@@ -30,6 +31,7 @@ app.use((req, _res, next) => {
     "Request data",
     _.pick(req, ["url", "body", "params", "query", "rawHeaders"])
   );
+  stats.increment("routes.start");
   next();
 });
 
