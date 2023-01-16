@@ -7,17 +7,14 @@ const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
 
 let schedulerRunning = false;
-let runScheduler = false;
 
 async function scheduleQueries() {
+  if (schedulerRunning) return;
+
   const startTime = new Date();
-  if (schedulerRunning) {
-    runScheduler = true;
-    return;
-  }
+  logger.info("Scheduling pending queries");
 
   try {
-    logger.info("Scheduling pending queries");
     const [availableClusters, queriesToSchedule] = await Promise.all([
       knex("cluster").where({ status: CLUSTER_STATUS.ENABLED }),
       knex("query").where({ status: QUERY_STATUS.AWAITING_SCHEDULING }),
@@ -76,10 +73,6 @@ async function scheduleQueries() {
   } finally {
     stats.timing("scheduler.timing", new Date() - startTime);
     schedulerRunning = false;
-    if (runScheduler) {
-      runScheduler = false;
-      scheduleQueries();
-    }
   }
 }
 
