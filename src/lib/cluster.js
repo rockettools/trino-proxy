@@ -1,7 +1,6 @@
 const _ = require("lodash");
 const url = require("url");
-const axios = require("axios").default;
-
+const { axios } = require("./axios");
 const { knex } = require("./knex");
 
 const CLUSTER_STATUS = {
@@ -49,8 +48,10 @@ async function getSession(clusterId) {
 
 async function getQueryStatus(clusterId, queryId) {
   // TODO cache these sessions somewhere and add in an auth check to handle expiration
-  const session = await getSession(clusterId);
-  const cluster = await getClusterById(clusterId);
+  const [session, cluster] = await Promise.all([
+    getSession(clusterId),
+    getClusterById(clusterId),
+  ]);
 
   let result;
   try {

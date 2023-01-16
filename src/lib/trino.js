@@ -1,5 +1,4 @@
-const axios = require("axios").default;
-
+const { axios } = require("../lib/axios");
 const { CLUSTER_STATUS } = require("../lib/cluster");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
@@ -8,11 +7,27 @@ const { QUERY_STATUS } = require("../lib/query");
 
 let schedulerRunning = false;
 
+async function checkHealthyCluster(clusterUrl) {
+  for (let idx = 0; idx <= 3; idx++) {
+    const response = await axios({
+      url: clusterUrl + "/v1/info",
+      method: "get",
+    });
+
+    if (!response.data.starting) {
+      return true;
+    }
+
+    // Wait a second before trying again
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error("Cluster not healthy");
+}
+
 async function scheduleQueries() {
   if (schedulerRunning) return;
-
   const startTime = new Date();
-  logger.info("Scheduling pending queries");
 
   try {
     const [availableClusters, queriesToSchedule] = await Promise.all([
@@ -22,7 +37,7 @@ async function scheduleQueries() {
 
     stats.histogram("available_clusters", availableClusters.length);
     stats.histogram("queries_waiting_scheduling", queriesToSchedule.length);
-    logger.debug("Queries awaiting scheduling", {
+    logger.debug("Scheduling pending queries", {
       queries: queriesToSchedule.length,
       clusters: availableClusters.length,
     });
@@ -47,6 +62,10 @@ async function scheduleQueries() {
 
       const userTags = Array.isArray(query.tags) ? query.tags : [];
       const clientTags = userTags.concat("trino-proxy");
+
+      // Ensure the cluster isn't starting up and is ready for statements
+      // Issuing queries too early can cause them to fail
+      await checkHealthyCluster(cluster.url);
 
       const response = await axios({
         url: cluster.url + "/v1/statement",
