@@ -65,6 +65,3 @@ if (!HTTPS_ENABLED || HTTP_ENABLED) {
   const httpServer = http.createServer(app);
   httpServer.listen(HTTP_LISTEN_PORT);
 }
-
-// Require babysitter last once server is setup and running successfully
-require("./babysitter");

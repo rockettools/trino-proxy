@@ -41,8 +41,6 @@ make format
 
 ## Configuration
 
-- BABYSITTER_DELAY: interval for babysitter worker (default: 3 seconds)
-- BABYSITTER_DISABLED: disable the query babysitter (set to true)
 - DB_URL: postgres database connection string
 - HTTP_ENABLED: whether HTTP server is enabled (set to true)
 - HTTP_LISTEN_PORT: HTTP port (default: 8080)
