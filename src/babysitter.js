@@ -61,5 +61,6 @@ async function runBabysitAndReschedule() {
 
 // Kick off initial babysit task
 if (!BABYSITTER_DISABLED) {
+  logger.info(`Scheduling query babysitter to run every ${BABYSITTER_DELAY}ms`);
   runBabysitAndReschedule();
 }

@@ -1,4 +1,5 @@
 const axios = require("axios").default;
+const bluebird = require("bluebird");
 
 const { CLUSTER_STATUS } = require("../lib/cluster");
 const { knex } = require("../lib/knex");
@@ -7,36 +8,56 @@ const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
 
 let schedulerRunning = false;
-let runScheduler = false;
+const SCHEDULER_DELAY_MS = 1000 * 15;
 
 async function scheduleQueries() {
-  logger.debug("Scheduling pending queries");
-  if (schedulerRunning) {
-    runScheduler = true;
-    return;
-  }
+  if (schedulerRunning) return;
+  const startTime = new Date();
 
   try {
-    const availableClusters = await knex("cluster").where({
-      status: CLUSTER_STATUS.ENABLED,
-    });
-    if (availableClusters.length === 0) {
-      logger.error("No clusters");
-      return;
-    }
-
-    let currentClusterId = Math.floor(Math.random() * availableClusters.length);
-
     const queriesToSchedule = await knex("query").where({
       status: QUERY_STATUS.AWAITING_SCHEDULING,
     });
 
-    stats.histogram("queries_waiting_scheduling", queriesToSchedule.length);
+    stats.increment("queries_waiting_scheduling", queriesToSchedule.length);
+    if (queriesToSchedule.length === 0) return;
 
-    for (let idx = 0; idx < queriesToSchedule.length; idx++) {
-      const query = queriesToSchedule[idx];
+    const enabledClusters = await knex("cluster").where({
+      status: CLUSTER_STATUS.ENABLED,
+    });
+
+    // Filter to only clusters that are healthy and ready for queries
+    const availableClusters = await bluebird.filter(
+      enabledClusters,
+      async (cluster) => {
+        const clusterHealthy = await isClusterHealthy(cluster.url);
+        stats.increment("check_cluster_health", [
+          `cluster:${cluster.name}`,
+          `healthy:${clusterHealthy}`,
+        ]);
+        return clusterHealthy;
+      }
+    );
+
+    stats.increment("available_clusters", availableClusters.length);
+    if (availableClusters.length === 0) {
+      logger.error("No healthy clusters available", {
+        enabled: enabledClusters.length,
+      });
+      return;
+    }
+
+    logger.debug("Scheduling pending queries", {
+      queries: queriesToSchedule.length,
+      availableClusters: availableClusters.length,
+    });
+
+    let currentClusterId = Math.floor(Math.random() * availableClusters.length);
+    for (const query of queriesToSchedule) {
       const cluster = availableClusters[currentClusterId];
       currentClusterId = (currentClusterId + 1) % availableClusters.length;
+
+      // Pass through any user tags to Trino for resource group management
       const userTags = Array.isArray(query.tags) ? query.tags : [];
       // Add custom tag so that queries can always be traced back to trino-proxy
       const clientTags = userTags.concat("trino-proxy");
@@ -47,7 +68,7 @@ async function scheduleQueries() {
         user: query.assumed_user,
         source: query.source,
         clientTags,
-        currentClusterId,
+        clusterId: cluster.id,
       });
 
       const response = await axios({
@@ -73,26 +94,40 @@ async function scheduleQueries() {
   } catch (err) {
     logger.error("Error scheduling queries", err);
   } finally {
+    stats.timing("scheduler.timing", new Date() - startTime);
     schedulerRunning = false;
-
-    if (runScheduler) {
-      runScheduler = false;
-      scheduleQueries();
-    }
   }
 }
 
-async function runScheduledScheduleQueries() {
+/**
+ * Checks that the Trino cluster is finished initializing. It appears that the http server starts
+ * accepting queries before they're able to be queued, causing them to fail seconds later.
+ * This function throws an error if the cluster is is not accessible or is initializing.
+ *
+ * TODO: improve this to cache the server status or prefetch it to minimize time between
+ * trino-proxy accepting a new query and it being passed off to a Trino cluster.
+ */
+async function isClusterHealthy(clusterBaseUrl) {
   try {
-    await scheduleQueries();
-  } catch (err) {
-    logger.error("Error scheduling queries", err);
-  }
+    const response = await axios({
+      url: `${clusterBaseUrl}/v1/info`,
+      method: "get",
+    });
 
-  setTimeout(runScheduledScheduleQueries, 10000);
+    // Cluster is healthy if `starting` property is false
+    return response.data && response.data.starting === false;
+  } catch (err) {
+    logger.error("Error checking cluster health", err, { clusterBaseUrl });
+    return false;
+  }
 }
 
-setTimeout(runScheduledScheduleQueries, 10000);
+async function runSchedulerAndReschedule() {
+  await scheduleQueries();
+  setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
+}
+
+setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 
 module.exports = {
   scheduleQueries,

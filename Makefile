@@ -13,7 +13,7 @@ format:
 
 # Start docker containers
 start:
-	docker-compose up --build
+	docker-compose up --build --attach proxy
 
 # Run database migrations against db
 migrate:
