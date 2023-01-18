@@ -60,6 +60,7 @@ module.exports = async function (req, res, next) {
           id: user.id,
           username: username,
           parsers: user.parsers,
+          tags: user.tags || [],
         };
       }
     }
