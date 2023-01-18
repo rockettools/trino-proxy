@@ -10,9 +10,15 @@ const BABYSITTER_DELAY = process.env.BABYSITTER_DELAY
   ? parseInt(process.env.BABYSITTER_DELAY)
   : 3000;
 
+const COMPLETED_STATUSES = [
+  QUERY_STATUS.LOST,
+  QUERY_STATUS.FINISHED,
+  QUERY_STATUS.FAILED,
+].join(",");
+
 async function babysitQueries() {
   const currentQueries = await knex.raw(
-    `select * from query where not status ilike any('{lost,finished,failed}')`
+    `select * from query where not status ilike any('{${COMPLETED_STATUSES}}')`
   );
 
   await BPromise.map(
