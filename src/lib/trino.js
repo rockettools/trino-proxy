@@ -37,9 +37,16 @@ async function scheduleQueries() {
       const query = queriesToSchedule[idx];
       const cluster = availableClusters[currentClusterId];
       currentClusterId = (currentClusterId + 1) % availableClusters.length;
+      const userTags = Array.isArray(query.tags) ? query.tags : [];
+      // Add custom tag so that queries can always be traced back to trino-proxy
+      const clientTags = userTags.concat("trino-proxy");
+
       logger.debug("Submitting query", {
         id: query.id,
         url: cluster.url,
+        user: query.assumed_user,
+        source: query.source,
+        clientTags,
         currentClusterId,
       });
 
@@ -48,11 +55,13 @@ async function scheduleQueries() {
         method: "post",
         headers: {
           "X-Trino-User": query.assumed_user,
-          "X-Trino-Source": "trino-proxy",
+          "X-Trino-Source": query.source || "trino-proxy",
+          "X-Trino-Client-Tags": clientTags.join(","),
         },
         data: query.body,
       });
 
+      logger.debug("Trino cluster response", { data: response.data });
       const nextURI = response.data.nextUri.split(response.data.id + "/")[1];
       await knex("query").where({ id: query.id }).update({
         cluster_query_id: response.data.id,

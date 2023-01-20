@@ -66,6 +66,7 @@ router.post("/v1/statement", async (req, res) => {
 
   const newQueryId = uuidv4();
   const times = new Date();
+  const querySource = req.headers["x-trino-source"] || null;
 
   await knex("query").insert({
     id: newQueryId,
@@ -73,7 +74,9 @@ router.post("/v1/statement", async (req, res) => {
     body: req.body,
     trace_id: trinoTraceToken,
     assumed_user: assumedUser,
-    user: req.user ? req.user.id : null,
+    source: querySource,
+    tags: req.user.tags || [],
+    user: req.user.id || null,
     created_at: times,
     updated_at: times,
   });
