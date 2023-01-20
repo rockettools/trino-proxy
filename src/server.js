@@ -4,6 +4,7 @@ const http = require("http");
 const https = require("https");
 
 const logger = require("./lib/logger");
+const stats = require("./lib/stats");
 const authenticationMiddleware = require("./middlewares/authentication");
 
 const HTTP_ENABLED = process.env.HTTP_ENABLED === "true";
@@ -38,9 +39,15 @@ app.use("/", require("./routes/cluster"));
 app.use("/", require("./routes/trino"));
 app.use("/", require("./routes/user"));
 
+// Health check
+app.use("/health", (_req, res) => {
+  stats.increment("healthcheck");
+  return res.status(200).json({ status: "ok" });
+});
+
 // Fallback handler
 app.use("/", (req, res) => {
-  logger.debug("No matching route", _.pick(req, ["url", "body"]));
+  logger.warn("No matching route", _.pick(req, ["url", "body"]));
   return res.send("Hello Trino!");
 });
 
