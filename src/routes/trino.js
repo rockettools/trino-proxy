@@ -93,7 +93,7 @@ router.post("/v1/statement", async (req, res) => {
           newQueryId +
           "/mock_next_uri/1",
         stats: {
-          state: "QUEUED",
+          state: QUERY_STATUS.QUEUED,
         },
       },
       newQueryId,
@@ -130,7 +130,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
             query.id +
             "/mock_next_uri/1",
           stats: {
-            state: "QUEUED",
+            state: QUERY_STATUS.QUEUED,
           },
         },
         query.id,
@@ -151,7 +151,7 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
             "/" +
             query.next_uri,
           stats: {
-            state: "QUEUED",
+            state: QUERY_STATUS.QUEUED,
           },
         },
         query.id,

@@ -5,12 +5,8 @@ const axios = require("axios").default;
 const { knex } = require("./knex");
 
 const CLUSTER_STATUS = {
-  ENABLED: "enabled",
-  DISABLED: "disabled",
-};
-
-const stateMap = {
-  FINISHED: "finished",
+  ENABLED: "ENABLED",
+  DISABLED: "DISABLED",
 };
 
 async function getClusterById(clusterId) {
@@ -69,7 +65,7 @@ async function getQueryStatus(clusterId, queryId) {
   }
 
   return {
-    state: stateMap[result.data.state] || result.data.state,
+    state: result.data.state,
     cumulativeUserMemoryMB: _.get(
       result.data,
       "queryStats.cumulativeUserMemory"
