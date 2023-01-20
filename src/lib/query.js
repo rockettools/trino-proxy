@@ -2,11 +2,16 @@ const { knex } = require("./knex");
 const cache = require("./memcache");
 
 const QUERY_STATUS = {
-  AWAITING_SCHEDULING: "awaiting_scheduling",
-  FAILED: "failed",
-  FINISHED: "finished",
-  LOST: "lost",
-  QUEUED: "queued",
+  AWAITING_SCHEDULING: "AWAITING_SCHEDULING",
+  BLOCKED: "BLOCKED",
+  FAILED: "FAILED",
+  FINISHED: "FINISHED",
+  FINISHING: "FINISHING",
+  LOST: "LOST",
+  PLANNING: "PLANNING",
+  QUEUED: "QUEUED",
+  RUNNING: "RUNNING",
+  STARTING: "STARTING",
 };
 
 async function getQueryById(newQueryId) {
