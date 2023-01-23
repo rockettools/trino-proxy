@@ -19,7 +19,7 @@ async function scheduleQueries() {
       status: QUERY_STATUS.AWAITING_SCHEDULING,
     });
 
-    stats.increment("queries_waiting_scheduling", queriesToSchedule.length);
+    stats.gauge("queries_waiting_scheduling", queriesToSchedule.length);
     if (queriesToSchedule.length === 0) return;
 
     const enabledClusters = await knex("cluster").where({
@@ -39,7 +39,7 @@ async function scheduleQueries() {
       }
     );
 
-    stats.increment("available_clusters", availableClusters.length);
+    stats.gauge("available_clusters", availableClusters.length);
     if (availableClusters.length === 0) {
       logger.error("No healthy clusters available", {
         enabled: enabledClusters.length,
@@ -83,6 +83,7 @@ async function scheduleQueries() {
       });
 
       logger.debug("Trino cluster response", { data: response.data });
+      stats.increment("query_queued", 1);
       const nextURI = response.data.nextUri.split(response.data.id + "/")[1];
       await knex("query").where({ id: query.id }).update({
         cluster_query_id: response.data.id,
