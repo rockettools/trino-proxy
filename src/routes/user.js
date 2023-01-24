@@ -3,6 +3,7 @@ const argon2 = require("argon2");
 const uuidv4 = require("uuid").v4;
 
 const { knex } = require("../lib/knex");
+const logger = require("../lib/logger");
 
 const router = express.Router();
 
@@ -21,15 +22,20 @@ async function getHashedPasswords(password) {
 }
 
 router.get("/v1/user", async function (req, res) {
-  const data = await knex("user");
-  const users = data.map((user) => ({
-    id: user.id,
-    name: user.name,
-    parsers: user.parsers,
-    tags: user.tags,
-  }));
+  try {
+    const data = await knex("user");
+    const users = data.map((user) => ({
+      id: user.id,
+      name: user.name,
+      parsers: user.parsers,
+      tags: user.tags,
+    }));
 
-  return res.status(200).json({ users });
+    return res.status(200).json({ users });
+  } catch (err) {
+    logger.error("Error fetching users", err);
+    return res.status(500).json({ error: "A system error has occured" });
+  }
 });
 
 router.get("/v1/user/me", async function (req, res) {
@@ -43,32 +49,37 @@ router.get("/v1/user/me", async function (req, res) {
 router.post("/v1/user", async function (req, res) {
   const { username, password, parsers = null, tags = [] } = req.body;
 
-  // Allow the first user to be created without middleware authentication
-  if (!req.user) {
-    // unless this is the first user, we should block this
-    const c = await knex("user").count("*");
-    if (c[0].count > 0) {
-      return res.status(401).json({ error: "Unauthorized" });
+  try {
+    // Allow the first user to be created without middleware authentication
+    if (!req.user) {
+      // unless this is the first user, we should block this
+      const c = await knex("user").count("*");
+      if (c[0].count > 0) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // First user has to have a password for security purposes
+      if (!password) {
+        return res.status(400).json({ error: "Invalid input" });
+      }
     }
 
-    // First user has to have a password for security purposes
-    if (!password) {
-      return res.status(400).json({ error: "Invalid input" });
-    }
+    const userId = uuidv4();
+    const passwordList = await getHashedPasswords(password);
+    await knex("user").insert({
+      id: userId,
+      name: username,
+      password: passwordList,
+      parsers,
+      tags,
+      created_at: new Date(),
+    });
+
+    return res.status(200).json({ id: userId });
+  } catch (err) {
+    logger.error("Error creating new user", err);
+    return res.status(500).json({ error: "A system error has occured" });
   }
-
-  const userId = uuidv4();
-  const passwordList = await getHashedPasswords(password);
-  await knex("user").insert({
-    id: userId,
-    name: username,
-    password: passwordList,
-    parsers,
-    tags,
-    created_at: new Date(),
-  });
-
-  return res.status(200).json({ id: userId });
 });
 
 router.patch("/v1/user/:userId", async function (req, res) {
@@ -76,23 +87,28 @@ router.patch("/v1/user/:userId", async function (req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const userId = req.params.userId;
-  const user = await knex("user").where({ id: userId }).first();
-  if (!user) {
-    return res.status(404).json({ error: "Not found" });
+  try {
+    const userId = req.params.userId;
+    const user = await knex("user").where({ id: userId }).first();
+    if (!user) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const { password, parsers = null, tags = [] } = req.body;
+    const passwordList = await getHashedPasswords(password);
+
+    await knex("user").where({ id: userId }).update({
+      password: passwordList,
+      parsers,
+      tags,
+      updated_at: new Date(),
+    });
+
+    return res.status(200).json({ id: userId });
+  } catch (err) {
+    logger.error("Error updating user", err);
+    return res.status(500).json({ error: "A system error has occured" });
   }
-
-  const { password, parsers = null, tags = [] } = req.body;
-  const passwordList = await getHashedPasswords(password);
-
-  await knex("user").where({ id: userId }).update({
-    password: passwordList,
-    parsers,
-    tags,
-    updated_at: new Date(),
-  });
-
-  return res.status(200).json({ id: userId });
 });
 
 module.exports = router;

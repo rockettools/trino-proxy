@@ -72,7 +72,7 @@ async function scheduleQueries() {
       });
 
       const response = await axios({
-        url: cluster.url + "/v1/statement",
+        url: `${cluster.url}/v1/statement`,
         method: "post",
         headers: {
           "X-Trino-User": query.assumed_user,
