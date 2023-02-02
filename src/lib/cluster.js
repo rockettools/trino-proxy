@@ -23,7 +23,7 @@ async function getSession(clusterId) {
     });
 
     await axios({
-      url: cluster.url + "/ui/login",
+      url: `${cluster.url}/ui/login`,
       method: "post",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       data: params.toString(),
@@ -51,7 +51,7 @@ async function getQueryStatus(clusterId, queryId) {
   let result;
   try {
     result = await axios({
-      url: cluster.url + "/ui/api/query/" + queryId,
+      url: `${cluster.url}/ui/api/query/${queryId}`,
       method: "get",
       headers: { cookie: session },
     });

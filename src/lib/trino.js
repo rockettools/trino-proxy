@@ -66,7 +66,7 @@ async function scheduleQueries() {
       const clientTags = userTags.concat("trino-proxy");
 
       const response = await axios({
-        url: cluster.url + "/v1/statement",
+        url: `${cluster.url}/v1/statement`,
         method: "post",
         headers: {
           "X-Trino-User": user,
