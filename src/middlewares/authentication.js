@@ -19,7 +19,7 @@ module.exports = async function (req, res, next) {
 
         username = foundHeader[0];
         password = foundHeader[1];
-        logger.debug("Found Auth header", { username });
+        logger.silly("Found Auth header", { username });
 
         // only accept the first Authorization header
         break;
@@ -27,7 +27,7 @@ module.exports = async function (req, res, next) {
     }
   } else if (req.headers["x-trino-user"]) {
     username = req.headers["x-trino-user"];
-    logger.debug("Found Trino User header", { username });
+    logger.silly("Found Trino User header", { username });
   }
 
   if (username) {

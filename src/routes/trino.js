@@ -17,13 +17,12 @@ const { scheduleQueries } = require("../lib/trino");
 const router = express.Router();
 
 function getHost(req) {
-  return (
-    (req.headers["x-forwarded-proto"]
-      ? req.headers["x-forwarded-proto"] // TODO make sure this is only http or https
-      : req.protocol) +
-    "://" +
-    req.get("host")
-  );
+  const host = req.get("host");
+  const protocol = req.headers["x-forwarded-proto"]
+    ? req.headers["x-forwarded-proto"] // TODO make sure this is only http or https
+    : req.protocol;
+
+  return `${protocol}://${host}`;
 }
 
 router.post("/v1/statement", async (req, res) => {
@@ -42,7 +41,7 @@ router.post("/v1/statement", async (req, res) => {
   const trinoTraceToken = req.headers["x-trino-trace-token"] || null;
   if (trinoTraceToken) {
     const info = await getAssumedUserForTrace(trinoTraceToken);
-    logger.debug("Trace and already assumed user", { trinoTraceToken, info });
+    logger.silly("Trace and already assumed user", { trinoTraceToken, info });
 
     // If this is the first query in the sequence it should have the header, try and parse.
     if (!info) {
@@ -81,6 +80,7 @@ router.post("/v1/statement", async (req, res) => {
     updated_at: times,
   });
 
+  // Asynchronously schedule queries if not running already
   scheduleQueries();
 
   return res.json(

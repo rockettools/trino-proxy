@@ -60,11 +60,13 @@ if (HTTPS_ENABLED) {
   };
   const httpsServer = https.createServer(credentials, app);
   httpsServer.listen(HTTPS_LISTEN_PORT);
+  logger.info(`HTTPS server listen on port ${HTTPS_LISTEN_PORT}`);
 }
 
 if (!HTTPS_ENABLED || HTTP_ENABLED) {
   const httpServer = http.createServer(app);
   httpServer.listen(HTTP_LISTEN_PORT);
+  logger.info(`HTTP server listen on port ${HTTP_LISTEN_PORT}`);
 }
 
 // Require babysitter last once server is setup and running successfully
