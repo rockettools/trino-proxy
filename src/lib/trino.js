@@ -80,6 +80,7 @@ async function scheduleQueries() {
         user,
         source,
         clientTags,
+        queryId: query.id,
         cluster: cluster.name,
         data: response.data,
       });
