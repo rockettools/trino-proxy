@@ -16,7 +16,7 @@ services:
     environment:
       - DB_URL=postgres://trino_proxy:trino_proxy@postgres/trino_proxy
       - HTTP_ENABLED=true
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=info
       - NODE_ENV=production
 
   postgres:
