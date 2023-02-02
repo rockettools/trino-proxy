@@ -33,8 +33,7 @@ async function babysitQueries() {
       );
 
       // Set new status - null means the query was lost
-      const newStatus =
-        status && status.state ? status.state : QUERY_STATUS.LOST;
+      const newStatus = status?.state || QUERY_STATUS.LOST;
       await knex("query")
         .where("id", query.id)
         .update({ status: newStatus, updated_at: new Date() });
