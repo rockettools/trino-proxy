@@ -135,6 +135,7 @@ async function runSchedulerAndReschedule() {
   setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 }
 
+logger.info(`Scheduling query scheduler to run every ${SCHEDULER_DELAY_MS}ms`);
 setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 
 module.exports = {
