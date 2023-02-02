@@ -50,7 +50,6 @@ make format
 - HTTPS_KEY: HTTPS private key
 - HTTPS_LISTEN_PORT: HTTPS port (default: 8443)
 - LOG_LEVEL: log level (default: info)
-- LOG_QUERY: whether queries are logged
 - NODE_ENV: development or production
 - STATSD_HOST: statsd agent host (default: localhost)
 - STATSD_PORT: statsd agent port (default: 8125)

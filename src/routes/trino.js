@@ -31,11 +31,6 @@ router.post("/v1/statement", async (req, res) => {
   }
 
   try {
-    logger.debug("Submitting statement", {
-      user: req.user,
-      query: process.env.LOG_QUERY ? req.body : "",
-    });
-
     // TODO the assumedUser/real user pair should probably be locked for the trace set
     let assumedUser;
 
