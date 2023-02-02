@@ -39,7 +39,7 @@ async function replaceAuthorizationHeader(req) {
   }
 
   if (headerUser) {
-    logger.debug("Replacing authorization header", { headerUser });
+    logger.silly("Replacing authorization header", { headerUser });
     req.headers.authorization =
       "Basic " + Buffer.from(headerUser).toString("base64");
   }

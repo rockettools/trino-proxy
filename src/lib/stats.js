@@ -9,6 +9,6 @@ const {
 module.exports = new StatsD({
   host: STATSD_HOST,
   port: STATSD_PORT,
-  prefix: STATSD_PREFIX,
+  prefix: STATSD_PREFIX + ".",
   globalTags: { env: process.env.NODE_ENV },
 });

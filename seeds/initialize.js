@@ -1,4 +1,6 @@
 const uuidv4 = require("uuid").v4;
+const { CLUSTER_STATUS } = require("../src/lib/cluster");
+
 const now = new Date();
 
 /**
@@ -22,7 +24,7 @@ exports.seed = async function (knex) {
     id: uuidv4(),
     name: "trino",
     url: "http://trino:8080",
-    status: "enabled",
+    status: CLUSTER_STATUS.ENABLED,
     updated_at: now,
     created_at: now,
   });
