@@ -7,6 +7,7 @@ const logger = require("./lib/logger");
 const stats = require("./lib/stats");
 const authenticationMiddleware = require("./middlewares/authentication");
 
+const REQUEST_BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || "500kb";
 const HTTP_ENABLED = process.env.HTTP_ENABLED === "true";
 const HTTP_LISTEN_PORT = parseInt(process.env.HTTP_LISTEN_PORT) || 8080;
 const HTTPS_ENABLED = process.env.HTTPS_ENABLED === "true";
@@ -20,8 +21,8 @@ app.post("/v1/statement", (req, res, next) => {
   next();
 });
 
-app.use(express.json()); // for parsing application/json
-app.use(express.text()); // for parsing plain/text
+app.use(express.json({ limit: REQUEST_BODY_LIMIT })); // for parsing application/json
+app.use(express.text({ limit: REQUEST_BODY_LIMIT })); // for parsing plain/text
 
 // Middleware: authentication
 app.use(authenticationMiddleware);

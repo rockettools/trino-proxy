@@ -57,32 +57,40 @@ async function scheduleQueries() {
       const cluster = availableClusters[currentClusterId];
       currentClusterId = (currentClusterId + 1) % availableClusters.length;
 
+      const user = query.assumed_user || query.user;
+      const source = query.source || "trino-proxy";
+
       // Pass through any user tags to Trino for resource group management
       const userTags = Array.isArray(query.tags) ? query.tags : [];
       // Add custom tag so that queries can always be traced back to trino-proxy
       const clientTags = userTags.concat("trino-proxy");
 
-      logger.debug("Submitting query", {
-        id: query.id,
-        url: cluster.url,
-        user: query.assumed_user,
-        source: query.source,
-        clientTags,
-        clusterId: cluster.id,
-      });
-
       const response = await axios({
         url: `${cluster.url}/v1/statement`,
         method: "post",
         headers: {
-          "X-Trino-User": query.assumed_user,
-          "X-Trino-Source": query.source || "trino-proxy",
+          "X-Trino-User": user,
+          "X-Trino-Source": source,
           "X-Trino-Client-Tags": clientTags.join(","),
         },
         data: query.body,
       });
 
-      logger.debug("Trino cluster response", { data: response.data });
+      logger.info("Submitted query to Trino cluster", {
+        user,
+        source,
+        clientTags,
+        cluster: cluster.name,
+        data: response.data,
+      });
+
+      stats.increment("query_queued", [
+        `cluster:${cluster.name}`,
+        `user:${user}`,
+        `source:${source}`,
+        ...clientTags,
+      ]);
+
       const nextURI = response.data.nextUri.split(response.data.id + "/")[1];
       await knex("query").where({ id: query.id }).update({
         cluster_query_id: response.data.id,
