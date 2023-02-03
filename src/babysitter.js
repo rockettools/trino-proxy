@@ -11,10 +11,10 @@ const BABYSITTER_DELAY_MS = process.env.BABYSITTER_DELAY_MS
 // List of statuses to ignore checking. These are either pending or
 // finished queries and Trino may not have data for them anymore
 const IGNORED_STATUSES = [
-  QUERY_STATUS.AWAITING_SCHEDULING,
-  QUERY_STATUS.FAILED,
-  QUERY_STATUS.FINISHED,
-  QUERY_STATUS.LOST,
+  QUERY_STATUS.AWAITING_SCHEDULING, // not even sent to Trino yet
+  QUERY_STATUS.FINISHED, // already successful (on Trino)
+  QUERY_STATUS.FAILED, // already failed (on Trino)
+  QUERY_STATUS.LOST, // query was lost (by proxy)
 ].join(",");
 
 async function babysitQueries() {
