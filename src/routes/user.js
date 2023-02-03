@@ -34,7 +34,7 @@ router.get("/v1/user", async function (req, res) {
     return res.status(200).json({ users });
   } catch (err) {
     logger.error("Error fetching users", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
@@ -78,7 +78,7 @@ router.post("/v1/user", async function (req, res) {
     return res.status(200).json({ id: userId });
   } catch (err) {
     logger.error("Error creating new user", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
@@ -107,7 +107,7 @@ router.patch("/v1/user/:userId", async function (req, res) {
     return res.status(200).json({ id: userId });
   } catch (err) {
     logger.error("Error updating user", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 

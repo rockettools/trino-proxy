@@ -15,6 +15,7 @@ const {
 const { scheduleQueries } = require("../lib/trino");
 
 const router = express.Router();
+const MOCKED_NEXT_URI = "mock_next_uri";
 
 function getHost(req) {
   const host = req.get("host");
@@ -83,7 +84,7 @@ router.post("/v1/statement", async (req, res) => {
       {
         id: newQueryId,
         infoUri: `http://localhost:5110/ui/query.html?${newQueryId}`,
-        nextUri: `http://localhost:5110/v1/statement/queued/${newQueryId}/mock_next_uri/1`,
+        nextUri: `http://localhost:5110/v1/statement/queued/${newQueryId}/${MOCKED_NEXT_URI}/1`,
         stats: {
           state: QUERY_STATUS.QUEUED,
         },
@@ -94,7 +95,7 @@ router.post("/v1/statement", async (req, res) => {
     return res.status(200).json(returnBody);
   } catch (err) {
     logger.error("Error submitting statement", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
@@ -107,15 +108,18 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
 
     // If we are unable to find the queryMapping we're in trouble, fail the query.
     if (!query) {
+      logger.error("Query not found (queued)", { queryId });
       return res.status(404).json({ error: "Query not found" });
     }
 
+    // If the query is in the AWAITING_SCHEDULING state, then it hasn't been sent to a
+    // Trino cluster yet. Return a fake response with a mocked keyId until the query is scheduled.
     if (query.status === QUERY_STATUS.AWAITING_SCHEDULING) {
       const returnBody = updateUrls(
         {
           id: query.id,
           infoUri: `http://localhost:5110/ui/query.html?${query.id}`,
-          nextUri: `http://localhost:5110/v1/statement/queued/${query.id}/mock_next_uri/1`,
+          nextUri: `http://localhost:5110/v1/statement/queued/${query.id}/${MOCKED_NEXT_URI}/1`,
           stats: {
             state: QUERY_STATUS.QUEUED,
           },
@@ -126,7 +130,9 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
       return res.status(200).json(returnBody);
     }
 
-    if (keyId === "mock_next_uri") {
+    // If we received the mocked keyId back and we're no longer in AWAITING_SCHEDULING, then
+    // we can use the NEXT_URI from the Trino cluster to create a valid URL
+    if (keyId === MOCKED_NEXT_URI) {
       const returnBody = updateUrls(
         {
           id: query.id,
@@ -159,19 +165,19 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
       return res.status(200).json(returnBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
-        logger.error("Query not found (statement queued)", {
+        logger.error("Query not found on Trino cluster (statement queued)", {
           clusterId: query.cluster_query_id,
           queryId,
           keyId,
           num,
         });
 
-        return res.status(404).json({ error: "Query not found" });
+        return res.status(404).json({ error: "Queued query not found" });
       }
     }
   } catch (err) {
     logger.error("Error statement queued", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
@@ -183,6 +189,7 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
     const query = await getQueryById(queryId);
     // If we are unable to find the queryMapping we're in trouble, fail the query.
     if (!query) {
+      logger.error("Query not found (executing)", { queryId });
       return res.status(404).json({ error: "Query not found" });
     }
 
@@ -203,19 +210,19 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
       return res.status(200).json(returnBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
-        logger.error("Query not found (statement executing)", {
+        logger.error("Query not found on Trino cluster (statement executing)", {
           clusterId: query.cluster_query_id,
           queryId,
           keyId,
           num,
         });
 
-        return res.status(404).json({ error: "Query not found" });
+        return res.status(404).json({ error: "Executing query not found" });
       }
     }
   } catch (err) {
     logger.error("Error statement executing", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
