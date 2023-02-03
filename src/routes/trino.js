@@ -1,3 +1,4 @@
+const _ = require("lodash");
 const express = require("express");
 const uuidv4 = require("uuid").v4;
 const axios = require("axios").default;
@@ -24,6 +25,10 @@ function getHost(req) {
     : req.protocol;
 
   return `${protocol}://${host}`;
+}
+
+function getTrinoResponseHeaders(response) {
+  return _.pickBy(response.headers, (_value, key) => key.startsWith("x-trino"));
 }
 
 router.post("/v1/statement", async (req, res) => {
@@ -161,8 +166,9 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
         headers: req.headers,
       });
 
+      const returnHeaders = getTrinoResponseHeaders(response);
       const returnBody = updateUrls(response.data, queryId, getHost(req));
-      return res.status(200).json(returnBody);
+      return res.status(200).set(returnHeaders).json(returnBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
         logger.error("Query not found on Trino cluster (statement queued)", {
@@ -206,8 +212,9 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
         headers: req.headers,
       });
 
+      const returnHeaders = getTrinoResponseHeaders(response);
       const returnBody = updateUrls(response.data, queryId, getHost(req));
-      return res.status(200).json(returnBody);
+      return res.status(200).set(returnHeaders).json(returnBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
         logger.error("Query not found on Trino cluster (statement executing)", {
