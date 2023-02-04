@@ -37,6 +37,7 @@ app.use((req, _res, next) => {
 
 // Add routes
 app.use("/", require("./routes/cluster"));
+app.use("/", require("./routes/query"));
 app.use("/", require("./routes/trino"));
 app.use("/", require("./routes/user"));
 
