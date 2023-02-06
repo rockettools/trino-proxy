@@ -3,7 +3,10 @@ const express = require("express");
 const uuidv4 = require("uuid").v4;
 const axios = require("axios").default;
 
-const { updateUrls, replaceAuthorizationHeader } = require("../lib/helpers");
+const {
+  getProxiedBody,
+  replaceAuthorizationHeader,
+} = require("../lib/helpers");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const cache = require("../lib/memcache");
@@ -16,7 +19,9 @@ const {
 const { scheduleQueries } = require("../lib/trino");
 
 const router = express.Router();
-const MOCKED_NEXT_URI = "mock_next_uri";
+const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
+const MOCKED_QUERY_KEY_ID = "AWAITING_SCHEDULING";
+const MOCKED_QUERY_NUM = "0";
 
 function getHost(req) {
   const host = req.get("host");
@@ -27,8 +32,8 @@ function getHost(req) {
   return `${protocol}://${host}`;
 }
 
-function getTrinoResponseHeaders(response) {
-  return _.pickBy(response.headers, (_value, key) => key.startsWith("x-trino"));
+function getTrinoHeaders(headers = {}) {
+  return _.pickBy(headers, (_value, key) => key.startsWith("x-trino"));
 }
 
 router.post("/v1/statement", async (req, res) => {
@@ -69,14 +74,22 @@ router.post("/v1/statement", async (req, res) => {
     const times = new Date();
     const querySource = req.headers["x-trino-source"] || null;
 
+    // Querty tags are a combination of those from the user and passed through the headers
+    const queryTags = new Set(req.user.tags);
+    const headerTags = req.headers["x-trino-client-tags"];
+    if (headerTags) {
+      queryTags.add(...headerTags.split(","));
+    }
+
     await knex("query").insert({
       id: newQueryId,
       status: QUERY_STATUS.AWAITING_SCHEDULING,
       body: req.body,
+      trino_request_headers: getTrinoHeaders(req.headers),
       trace_id: trinoTraceToken,
       assumed_user: assumedUser,
       source: querySource,
-      tags: req.user.tags || [],
+      tags: Array.from(queryTags),
       user: req.user.id || null,
       created_at: times,
       updated_at: times,
@@ -85,11 +98,14 @@ router.post("/v1/statement", async (req, res) => {
     // Asynchronously schedule queries if not running already
     scheduleQueries();
 
-    const returnBody = updateUrls(
+    // Return a mock response with mocked query keyId and num until the query is scheduled and
+    // a real URL is created for the client to call next. This service will continously return
+    // this mocked nextUri until a valid one is available.
+    const returnBody = getProxiedBody(
       {
         id: newQueryId,
-        infoUri: `http://localhost:5110/ui/query.html?${newQueryId}`,
-        nextUri: `http://localhost:5110/v1/statement/queued/${newQueryId}/${MOCKED_NEXT_URI}/1`,
+        infoUri: `${TEMP_HOST}/ui/query.html?${newQueryId}`,
+        nextUri: `${TEMP_HOST}/v1/statement/queued/${newQueryId}/${MOCKED_QUERY_KEY_ID}/${MOCKED_QUERY_NUM}`,
         stats: {
           state: QUERY_STATUS.QUEUED,
         },
@@ -120,11 +136,11 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
     // If the query is in the AWAITING_SCHEDULING state, then it hasn't been sent to a
     // Trino cluster yet. Return a fake response with a mocked keyId until the query is scheduled.
     if (query.status === QUERY_STATUS.AWAITING_SCHEDULING) {
-      const returnBody = updateUrls(
+      const returnBody = getProxiedBody(
         {
           id: query.id,
-          infoUri: `http://localhost:5110/ui/query.html?${query.id}`,
-          nextUri: `http://localhost:5110/v1/statement/queued/${query.id}/${MOCKED_NEXT_URI}/1`,
+          infoUri: `${TEMP_HOST}/ui/query.html?${query.id}`,
+          nextUri: `${TEMP_HOST}/v1/statement/queued/${query.id}/${MOCKED_QUERY_KEY_ID}/${MOCKED_QUERY_NUM}`,
           stats: {
             state: QUERY_STATUS.QUEUED,
           },
@@ -135,16 +151,16 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
       return res.status(200).json(returnBody);
     }
 
-    // If we received the mocked keyId back and we're no longer in AWAITING_SCHEDULING, then
+    // If we received the mocked keyId/num pair back and we're no longer in AWAITING_SCHEDULING,
     // we can use the NEXT_URI from the Trino cluster to create a valid URL
-    if (keyId === MOCKED_NEXT_URI) {
-      const returnBody = updateUrls(
+    if (keyId === MOCKED_QUERY_KEY_ID && num === MOCKED_QUERY_NUM) {
+      const returnBody = getProxiedBody(
         {
-          id: query.id,
-          infoUri: `http://localhost:5110/ui/query.html?${query.id}`,
-          nextUri: `http://localhost:5110/v1/statement/queued/${query.id}/${query.next_uri}`,
+          id: query.cluster_query_id,
+          infoUri: `${TEMP_HOST}/ui/query.html?${query.id}`,
+          nextUri: query.next_uri,
           stats: {
-            state: QUERY_STATUS.QUEUED,
+            state: query.status,
           },
         },
         query.id,
@@ -160,14 +176,22 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
     await replaceAuthorizationHeader(req);
 
     try {
+      // Passthrough this QUEUED request to the Trino cluster
       const response = await axios({
         url: `${cluster.url}/v1/statement/queued/${query.cluster_query_id}/${keyId}/${num}`,
         method: "get",
         headers: req.headers,
       });
 
-      const returnHeaders = getTrinoResponseHeaders(response);
-      const returnBody = updateUrls(response.data, queryId, getHost(req));
+      await knex("query")
+        .where({ id: query.id })
+        .update({
+          status: response.data?.stats?.state,
+          next_uri: response.data.nextUri || null,
+        });
+
+      const returnHeaders = getTrinoHeaders(response.headers);
+      const returnBody = getProxiedBody(response.data, queryId, getHost(req));
       return res.status(200).set(returnHeaders).json(returnBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
@@ -206,14 +230,22 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
     await replaceAuthorizationHeader(req);
 
     try {
+      // Passthrough this EXECUTING request to the Trino cluster
       const response = await axios({
         url: `${cluster.url}/v1/statement/executing/${query.cluster_query_id}/${keyId}/${num}`,
         method: "get",
         headers: req.headers,
       });
 
-      const returnHeaders = getTrinoResponseHeaders(response);
-      const returnBody = updateUrls(response.data, queryId, getHost(req));
+      await knex("query")
+        .where({ id: query.id })
+        .update({
+          status: response.data?.stats?.state,
+          next_uri: response.data.nextUri || null,
+        });
+
+      const returnHeaders = getTrinoHeaders(response.headers);
+      const returnBody = getProxiedBody(response.data, queryId, getHost(req));
       return res.status(200).set(returnHeaders).json(returnBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {

@@ -61,27 +61,43 @@ async function scheduleQueries() {
       const source = query.source || "trino-proxy";
 
       // Pass through any user tags to Trino for resource group management
-      const userTags = Array.isArray(query.tags) ? query.tags : [];
+      const clientTags = new Set(query.tags);
       // Add custom tag so that queries can always be traced back to trino-proxy
-      const clientTags = userTags.concat("trino-proxy");
+      clientTags.add("trino-proxy");
 
+      const trinoHeaders = {
+        // passthrough headers from client state
+        ...query.trino_request_headers,
+        // Overwrite the user, source, and tag headers with updated values
+        "X-Trino-User": user,
+        "X-Trino-Source": source,
+        "X-Trino-Client-Tags": Array.from(clientTags).join(","),
+      };
+
+      // Issue the statement request to the Trino cluster. This does not actually
+      // kick off execution of the query, the first nextUri call does.
       const response = await axios({
         url: `${cluster.url}/v1/statement`,
         method: "post",
-        headers: {
-          "X-Trino-User": user,
-          "X-Trino-Source": source,
-          "X-Trino-Client-Tags": clientTags.join(","),
-        },
+        headers: trinoHeaders,
         data: query.body,
       });
 
+      await knex("query")
+        .where({ id: query.id })
+        .update({
+          cluster_query_id: response.data.id,
+          cluster_id: cluster.id,
+          status: response.data?.stats?.state || QUERY_STATUS.QUEUED,
+          next_uri: response.data.nextUri,
+        });
+
       logger.info("Submitted query to Trino cluster", {
+        queryId: query.id,
+        cluster: cluster.name,
         user,
         source,
         clientTags,
-        queryId: query.id,
-        cluster: cluster.name,
         data: response.data,
       });
 
@@ -91,14 +107,6 @@ async function scheduleQueries() {
         `source:${source}`,
         ...clientTags,
       ]);
-
-      const nextURI = response.data.nextUri.split(response.data.id + "/")[1];
-      await knex("query").where({ id: query.id }).update({
-        cluster_query_id: response.data.id,
-        cluster_id: cluster.id,
-        status: QUERY_STATUS.QUEUED,
-        next_uri: nextURI,
-      });
     }
   } catch (err) {
     logger.error("Error scheduling queries", err);
