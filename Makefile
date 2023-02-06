@@ -24,3 +24,5 @@ migrate:
 # Cleanup all docker containers
 clean:
 	docker-compose down
+
+reset: clean migrate start
