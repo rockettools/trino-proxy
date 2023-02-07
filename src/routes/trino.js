@@ -201,6 +201,8 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
           num,
         });
 
+        // Update query status to lost
+        await updateQuery(query.id, { status: QUERY_STATUS.LOST });
         return res.status(404).json({ error: "Queued query not found" });
       }
     }
@@ -253,6 +255,8 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
           num,
         });
 
+        // Update query status to lost
+        await updateQuery(query.id, { status: QUERY_STATUS.LOST });
         return res.status(404).json({ error: "Executing query not found" });
       }
     }
