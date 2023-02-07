@@ -13,6 +13,7 @@ const cache = require("../lib/memcache");
 const {
   getQueryById,
   getAssumedUserForTrace,
+  updateQuery,
   QUERY_STATUS,
 } = require("../lib/query");
 
@@ -183,12 +184,10 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
         headers: req.headers,
       });
 
-      await knex("query")
-        .where({ id: query.id })
-        .update({
-          status: response.data?.stats?.state,
-          next_uri: response.data.nextUri || null,
-        });
+      await updateQuery(query.id, {
+        status: response.data?.stats?.state,
+        next_uri: response.data.nextUri || null,
+      });
 
       const returnHeaders = getTrinoHeaders(response.headers);
       const returnBody = getProxiedBody(response.data, queryId, getHost(req));
@@ -237,12 +236,10 @@ router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
         headers: req.headers,
       });
 
-      await knex("query")
-        .where({ id: query.id })
-        .update({
-          status: response.data?.stats?.state,
-          next_uri: response.data.nextUri || null,
-        });
+      await updateQuery(query.id, {
+        status: response.data?.stats?.state,
+        next_uri: response.data.nextUri || null,
+      });
 
       const returnHeaders = getTrinoHeaders(response.headers);
       const returnBody = getProxiedBody(response.data, queryId, getHost(req));

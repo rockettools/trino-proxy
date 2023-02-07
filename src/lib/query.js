@@ -1,5 +1,7 @@
 const { knex } = require("./knex");
 const cache = require("./memcache");
+const logger = require("./logger");
+const stats = require("./stats");
 
 const QUERY_STATUS = {
   AWAITING_SCHEDULING: "AWAITING_SCHEDULING",
@@ -38,8 +40,20 @@ async function getAssumedUserForTrace(traceId) {
   return null;
 }
 
+async function updateQuery(queryId, data = {}) {
+  try {
+    await knex("query").where({ id: queryId }).update(data);
+  } catch (err) {
+    logger.error("Error updating query status", err, { queryId });
+  }
+
+  logger.debug("Updated query", { queryId, data });
+  stats.increment("query_updated", [`status:${data.status}`]);
+}
+
 module.exports = {
   getAssumedUserForTrace,
   getQueryById,
+  updateQuery,
   QUERY_STATUS,
 };
