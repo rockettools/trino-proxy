@@ -59,27 +59,26 @@ async function scheduleQueries() {
 
       const user = query.assumed_user || query.user;
       const source = query.source || "trino-proxy";
+      const trinoHeaders = query.trino_request_headers || {};
 
       // Pass through any user tags to Trino for resource group management
       const clientTags = new Set(query.tags);
       // Add custom tag so that queries can always be traced back to trino-proxy
       clientTags.add("trino-proxy");
 
-      const trinoHeaders = {
-        // passthrough headers from client state
-        ...query.trino_request_headers,
-        // Overwrite the user, source, and tag headers with updated values
-        "X-Trino-User": user,
-        "X-Trino-Source": source,
-        "X-Trino-Client-Tags": Array.from(clientTags).join(","),
-      };
-
       // Issue the statement request to the Trino cluster. This does not actually
       // kick off execution of the query, the first nextUri call does.
       const response = await axios({
         url: `${cluster.url}/v1/statement`,
         method: "post",
-        headers: trinoHeaders,
+        headers: {
+          // passthrough headers from client state
+          ...trinoHeaders,
+          // Overwrite the user, source, and tag headers with updated values
+          "X-Trino-User": user,
+          "X-Trino-Source": source,
+          "X-Trino-Client-Tags": Array.from(clientTags).join(","),
+        },
         data: query.body,
       });
 
