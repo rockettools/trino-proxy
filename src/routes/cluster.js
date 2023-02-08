@@ -21,7 +21,7 @@ router.get("/v1/cluster", async function (req, res) {
     return res.status(200).json({ clusters: items });
   } catch (err) {
     logger.error("Error fetching clusters", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
@@ -52,7 +52,7 @@ router.post("/v1/cluster", async function (req, res) {
     return res.status(201).json({ id: clusterId });
   } catch (err) {
     logger.error("Error creating cluster", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
@@ -83,7 +83,7 @@ router.patch("/v1/cluster/:clusterId", async function (req, res) {
     return res.status(200).json({ id: clusterId });
   } catch (err) {
     logger.error("Error updating cluster", err);
-    return res.status(500).json({ error: "A system error has occured" });
+    return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 

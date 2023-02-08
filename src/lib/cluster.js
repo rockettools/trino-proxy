@@ -44,9 +44,14 @@ async function getSession(clusterId) {
 }
 
 async function getQueryStatus(clusterId, queryId) {
+  if (!clusterId) throw new Error("Missing cluster id");
+  if (!queryId) throw new Error("Missing query id");
+
   // TODO cache these sessions somewhere and add in an auth check to handle expiration
-  const session = await getSession(clusterId);
-  const cluster = await getClusterById(clusterId);
+  const [session, cluster] = await Promise.all([
+    getSession(clusterId),
+    getClusterById(clusterId),
+  ]);
 
   let result;
   try {

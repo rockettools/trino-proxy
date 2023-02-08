@@ -37,19 +37,30 @@ app.use((req, _res, next) => {
 
 // Add routes
 app.use("/", require("./routes/cluster"));
+app.use("/", require("./routes/query"));
 app.use("/", require("./routes/trino"));
 app.use("/", require("./routes/user"));
 
 // Health check
-app.use("/health", (_req, res) => {
+app.get("/health", (_req, res) => {
   stats.increment("healthcheck");
   return res.status(200).json({ status: "ok" });
 });
 
+// Mock info endpoint to abstract out the cluster information
+app.get("/v1/info", async (req, res) => {
+  return res.status(200).json({
+    nodeVersion: { version: "trino-proxy" },
+    environment: "docker",
+    coordinator: true,
+    starting: false,
+  });
+});
+
 // Fallback handler
-app.use("/", (req, res) => {
+app.use("*", (req, res) => {
   logger.warn("No matching route", _.pick(req, ["url", "body"]));
-  return res.send("Hello Trino!");
+  return res.status(404).json({ error: "Unknown route" });
 });
 
 // Setup server and start listening for requests
@@ -68,6 +79,3 @@ if (!HTTPS_ENABLED || HTTP_ENABLED) {
   httpServer.listen(HTTP_LISTEN_PORT);
   logger.info(`HTTP server listen on port ${HTTP_LISTEN_PORT}`);
 }
-
-// Require babysitter last once server is setup and running successfully
-require("./babysitter");

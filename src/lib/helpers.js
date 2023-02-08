@@ -1,21 +1,29 @@
+const _ = require("lodash");
 const logger = require("./logger");
 const { getAssumedUserForTrace } = require("./query");
 
-function updateUrls(body, newQueryId, host) {
-  const queryId = body.id;
-  body.id = newQueryId;
+function getProxiedBody(clusterBody, proxyId, proxyHost) {
+  const newBody = _.cloneDeep(clusterBody);
+  // Save cluser's queryId for string replacement
+  const clusterQueryId = newBody.id;
+  // Overwrite cluster's queryId with that of trino-proxy
+  newBody.id = proxyId;
 
-  if (body.infoUri) {
-    body.infoUri = body.infoUri
-      .replace(queryId, newQueryId)
-      .replace(/https?:\/\/[^/]+/, host);
+  // Update infoUri link with proxy queryId and proxy host
+  if (newBody.infoUri) {
+    newBody.infoUri = newBody.infoUri
+      .replace(clusterQueryId, proxyId)
+      .replace(/https?:\/\/[^/]+/, proxyHost);
   }
-  if (body.nextUri) {
-    body.nextUri = body.nextUri
-      .replace(queryId, newQueryId)
-      .replace(/https?:\/\/[^/]+/, host);
+
+  // Update nextUri link with proxy queryId and proxy host
+  if (newBody.nextUri) {
+    newBody.nextUri = newBody.nextUri
+      .replace(clusterQueryId, proxyId)
+      .replace(/https?:\/\/[^/]+/, proxyHost);
   }
-  return body;
+
+  return newBody;
 }
 
 function getUsernameFromAuthorizationHeader(header) {
@@ -46,7 +54,7 @@ async function replaceAuthorizationHeader(req) {
 }
 
 module.exports = {
+  getProxiedBody,
   getUsernameFromAuthorizationHeader,
   replaceAuthorizationHeader,
-  updateUrls,
 };
