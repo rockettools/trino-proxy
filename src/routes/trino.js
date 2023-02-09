@@ -121,16 +121,19 @@ router.post("/v1/statement", async (req, res) => {
   }
 });
 
-router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
-  const { queryId, keyId, num } = req.params;
-  logger.debug("Fetching statement status: queued", { queryId, keyId, num });
+router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
+  const { state, queryId, keyId, num } = req.params;
+  logger.debug("Fetching statement status", { state, queryId, keyId, num });
+  if (state !== "queued" && state !== "executing") {
+    logger.warn("Invalid statement status", { state, queryId });
+    return res.status(400).json({ error: "Invalid query state" });
+  }
 
   try {
     const query = await getQueryById(queryId);
-
-    // If we are unable to find the queryMapping we're in trouble, fail the query.
     if (!query) {
-      logger.error("Query not found (queued)", { queryId });
+      // If we are unable to find the queryMapping we're in trouble, fail the query
+      logger.error("Query not found (check status)", { queryId });
       return res.status(404).json({ error: "Query not found" });
     }
 
@@ -175,11 +178,12 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
       .first();
 
     await replaceAuthorizationHeader(req);
+    const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
 
     try {
-      // Passthrough this QUEUED request to the Trino cluster
+      // Passthrough this request to the Trino cluster
       const response = await axios({
-        url: `${cluster.url}/v1/statement/queued/${query.cluster_query_id}/${keyId}/${num}`,
+        url,
         method: "get",
         headers: req.headers,
       });
@@ -194,74 +198,71 @@ router.get("/v1/statement/queued/:queryId/:keyId/:num", async (req, res) => {
       return res.status(200).set(returnHeaders).json(returnBody);
     } catch (err) {
       if (err.response && err.response.status === 404) {
-        logger.error("Query not found on Trino cluster (statement queued)", {
-          clusterId: query.cluster_query_id,
+        logger.error("Query not found on Trino cluster", {
           queryId,
-          keyId,
-          num,
+          state,
+          url,
         });
 
         // Update query status to lost
         await updateQuery(query.id, { status: QUERY_STATUS.LOST });
-        return res.status(404).json({ error: "Queued query not found" });
+        return res.status(404).json({ error: "Query not found on cluster" });
       }
     }
   } catch (err) {
-    logger.error("Error statement queued", err);
+    logger.error("Error getting statement status", err, { params: req.params });
     return res.status(500).json({ error: "A system error has occurred" });
   }
 });
 
-router.get("/v1/statement/executing/:queryId/:keyId/:num", async (req, res) => {
-  const { queryId, keyId, num } = req.params;
-  logger.debug("Fetching statement status: executing", { queryId, keyId, num });
+router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
+  const { state, queryId, keyId, num } = req.params;
+  logger.debug("Cancelling query", { state, queryId, keyId, num });
 
   try {
     const query = await getQueryById(queryId);
-    // If we are unable to find the queryMapping we're in trouble, fail the query.
     if (!query) {
-      logger.error("Query not found (executing)", { queryId });
+      logger.error("Query not found (delete)", { queryId });
       return res.status(404).json({ error: "Query not found" });
     }
+
+    // Update status and nextUri first to prevent the query
+    // from being picked up by any database queries
+    await updateQuery(query.id, {
+      status: QUERY_STATUS.CANCELLED,
+      next_uri: null,
+    });
 
     const cluster = await knex("cluster")
       .where({ id: query.cluster_id })
       .first();
 
     await replaceAuthorizationHeader(req);
+    const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
 
     try {
-      // Passthrough this EXECUTING request to the Trino cluster
-      const response = await axios({
-        url: `${cluster.url}/v1/statement/executing/${query.cluster_query_id}/${keyId}/${num}`,
-        method: "get",
-        headers: req.headers,
-      });
-
-      await updateQuery(query.id, {
-        status: response.data?.stats?.state,
-        next_uri: response.data.nextUri || null,
-      });
-
-      const returnHeaders = getTrinoHeaders(response.headers);
-      const returnBody = getProxiedBody(response.data, queryId, getHost(req));
-      return res.status(200).set(returnHeaders).json(returnBody);
+      // Passthrough this deletion request to the Trino cluster to actually cancel the query
+      await axios({ url, method: "delete", headers: req.headers });
+      logger.info("Cancelled query on Trino cluster", { queryId });
     } catch (err) {
-      if (err.response && err.response.status === 404) {
-        logger.error("Query not found on Trino cluster (statement executing)", {
-          clusterId: query.cluster_query_id,
+      // Anything other than a 404 error should be logged. If the query can't be found
+      // then it's okay as we wanted to cancel it anyways.
+      if (err.response && err.response.status !== 404) {
+        logger.error("Query not found on Trino cluster", {
           queryId,
-          keyId,
-          num,
+          state,
+          url,
         });
 
         // Update query status to lost
         await updateQuery(query.id, { status: QUERY_STATUS.LOST });
-        return res.status(404).json({ error: "Executing query not found" });
+        return res.status(404).json({ error: "Query not found on cluster" });
       }
     }
+
+    return res.status(204).json({});
   } catch (err) {
-    logger.error("Error statement executing", err);
+    logger.error("Error cancelling statement", err, { params: req.params });
     return res.status(500).json({ error: "A system error has occurred" });
   }
 });
