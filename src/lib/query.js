@@ -4,7 +4,10 @@ const logger = require("./logger");
 const stats = require("./stats");
 
 const QUERY_STATUS = {
+  // Trino Proxy states
   AWAITING_SCHEDULING: "AWAITING_SCHEDULING",
+  CANCELLED: "CANCELLED",
+  // Trino states
   BLOCKED: "BLOCKED",
   FAILED: "FAILED",
   FINISHED: "FINISHED",

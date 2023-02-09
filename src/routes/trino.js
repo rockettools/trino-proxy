@@ -215,4 +215,56 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
   }
 });
 
+router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
+  const { state, queryId, keyId, num } = req.params;
+  logger.debug("Cancelling query", { state, queryId, keyId, num });
+
+  try {
+    const query = await getQueryById(queryId);
+    if (!query) {
+      logger.error("Query not found to cancel", { queryId });
+      return res.status(404).json({ error: "Query not found" });
+    }
+
+    // Update status and nextUri first to prevent the query
+    // from being picked up by any database queries
+    await updateQuery(query.id, {
+      status: QUERY_STATUS.CANCELLED,
+      next_uri: null,
+    });
+
+    const cluster = await knex("cluster")
+      .where({ id: query.cluster_id })
+      .first();
+
+    await replaceAuthorizationHeader(req);
+    const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
+
+    try {
+      // Passthrough this deletion request to the Trino cluster to actually cancel the query
+      await axios({ url, method: "delete", headers: req.headers });
+      logger.info("Cancelled query on Trino cluster", { queryId });
+    } catch (err) {
+      // Anything other than a 404 error should be logged. If the query can't be found
+      // then it's okay as we wanted to cancel it anyways.
+      if (err.response && err.response.status !== 404) {
+        logger.error("Query not found on Trino cluster", {
+          queryId,
+          state,
+          url,
+        });
+
+        // Update query status to lost
+        await updateQuery(query.id, { status: QUERY_STATUS.LOST });
+        return res.status(404).json({ error: "Query not found on cluster" });
+      }
+    }
+
+    return res.status(204).json({});
+  } catch (err) {
+    logger.error("Error cancelling statement", err);
+    return res.status(500).json({ error: "A system error has occurred" });
+  }
+});
+
 module.exports = router;
