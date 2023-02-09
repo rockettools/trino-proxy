@@ -133,7 +133,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
     const query = await getQueryById(queryId);
     if (!query) {
       // If we are unable to find the queryMapping we're in trouble, fail the query
-      logger.error("Query not found", { queryId });
+      logger.error("Query not found (check status)", { queryId });
       return res.status(404).json({ error: "Query not found" });
     }
 
@@ -210,7 +210,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       }
     }
   } catch (err) {
-    logger.error("Error statement executing", err);
+    logger.error("Error getting statement status", err, { params: req.params });
     return res.status(500).json({ error: "A system error has occurred" });
   }
 });
@@ -222,7 +222,7 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
   try {
     const query = await getQueryById(queryId);
     if (!query) {
-      logger.error("Query not found to cancel", { queryId });
+      logger.error("Query not found (delete)", { queryId });
       return res.status(404).json({ error: "Query not found" });
     }
 
@@ -262,7 +262,7 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
 
     return res.status(204).json({});
   } catch (err) {
-    logger.error("Error cancelling statement", err);
+    logger.error("Error cancelling statement", err, { params: req.params });
     return res.status(500).json({ error: "A system error has occurred" });
   }
 });
