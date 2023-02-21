@@ -3,18 +3,16 @@ const express = require("express");
 const uuidv4 = require("uuid").v4;
 const axios = require("axios").default;
 
-const {
-  getProxiedBody,
-  replaceAuthorizationHeader,
-} = require("../lib/helpers");
+const { getAuthorizationHeader, getProxiedBody } = require("../lib/helpers");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const cache = require("../lib/memcache");
 const {
   getQueryById,
-  getAssumedUserForTrace,
-  updateQuery,
+  getQueryHeaderInfo,
+  parseFirstQueryHeader,
   QUERY_STATUS,
+  updateQuery,
 } = require("../lib/query");
 
 const { scheduleQueries } = require("../lib/trino");
@@ -42,45 +40,41 @@ router.post("/v1/statement", async (req, res) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  try {
-    // TODO the assumedUser/real user pair should probably be locked for the trace set
-    let assumedUser;
+  // Default user to whoever submitted the query
+  let assumedUser = req.user.username;
+  // Initialize empty client tags using a set to prevent duplicates
+  const clientTags = new Set();
 
+  try {
     const trinoTraceToken = req.headers["x-trino-trace-token"] || null;
     if (trinoTraceToken) {
-      const info = await getAssumedUserForTrace(trinoTraceToken);
-      logger.silly("Trace and already assumed user", { trinoTraceToken, info });
+      let info = await getQueryHeaderInfo(trinoTraceToken);
 
       // If this is the first query in the sequence it should have the header, try and parse.
       if (!info) {
-        if (req.user && req.user.parsers && req.user.parsers.user) {
-          const parsedUser = new RegExp(req.user.parsers.user).exec(req.body);
-          if (parsedUser) {
-            assumedUser = parsedUser[1];
-          }
-        }
-
-        cache.set(trinoTraceToken, assumedUser);
-      } else {
-        assumedUser = info;
+        info = parseFirstQueryHeader(req.body, req.user.parsers);
+        logger.debug("Parsed header info from query", info);
+        cache.set(trinoTraceToken, info);
       }
+
+      assumedUser = info.user;
+      clientTags.add(...info.tags);
     }
 
-    assumedUser = assumedUser || req.user.username;
-    req.headers.authorization =
-      "Basic " +
-      Buffer.from(req.user.username + "__" + assumedUser).toString("base64");
+    // Add any custom user tags
+    if (Array.isArray(req.user.tags)) {
+      clientTags.add(...req.user.tags);
+    }
+
+    // Add any tags passed through in the X-Trino-Client-Tags header, which some clients provide
+    const headerTags = req.headers["x-trino-client-tags"];
+    if (headerTags) {
+      clientTags.add(...headerTags.split(","));
+    }
 
     const newQueryId = uuidv4();
     const times = new Date();
     const querySource = req.headers["x-trino-source"] || null;
-
-    // Querty tags are a combination of those from the user and passed through the headers
-    const queryTags = new Set(req.user.tags);
-    const headerTags = req.headers["x-trino-client-tags"];
-    if (headerTags) {
-      queryTags.add(...headerTags.split(","));
-    }
 
     await knex("query").insert({
       id: newQueryId,
@@ -90,7 +84,7 @@ router.post("/v1/statement", async (req, res) => {
       trace_id: trinoTraceToken,
       assumed_user: assumedUser,
       source: querySource,
-      tags: Array.from(queryTags),
+      tags: Array.from(clientTags),
       user: req.user.id || null,
       created_at: times,
       updated_at: times,
@@ -177,8 +171,8 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .where({ id: query.cluster_id })
       .first();
 
-    await replaceAuthorizationHeader(req);
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
+    req.headers.authorization = await getAuthorizationHeader(req.headers);
 
     try {
       // Passthrough this request to the Trino cluster
@@ -237,8 +231,8 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .where({ id: query.cluster_id })
       .first();
 
-    await replaceAuthorizationHeader(req);
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
+    req.headers.authorization = await getAuthorizationHeader(req.headers);
 
     try {
       // Passthrough this deletion request to the Trino cluster to actually cancel the query
