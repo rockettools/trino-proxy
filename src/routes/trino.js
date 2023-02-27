@@ -58,18 +58,21 @@ router.post("/v1/statement", async (req, res) => {
       }
 
       assumedUser = info.user;
-      clientTags.add(...info.tags);
+      if (Array.isArray(info.tags)) {
+        info.tags.forEach((t) => clientTags.add(t));
+      }
     }
 
     // Add any custom user tags
     if (Array.isArray(req.user.tags)) {
-      clientTags.add(...req.user.tags);
+      req.user.tags.forEach((t) => clientTags.add(t));
     }
 
     // Add any tags passed through in the X-Trino-Client-Tags header, which some clients provide
     const headerTags = req.headers["x-trino-client-tags"];
     if (headerTags) {
-      clientTags.add(...headerTags.split(","));
+      const splitTags = headerTags.split(",");
+      splitTags.forEach((t) => clientTags.add(t));
     }
 
     const newQueryId = uuidv4();

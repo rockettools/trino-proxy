@@ -44,7 +44,7 @@ async function getQueryHeaderInfo(traceId) {
   if (firstQueryInTrace) {
     return {
       user: firstQueryInTrace.assumed_user || firstQueryInTrace.user,
-      tags: new Set(firstQueryInTrace.tags),
+      tags: firstQueryInTrace.tags || [],
     };
   }
 
@@ -65,7 +65,7 @@ async function updateQuery(queryId, data = {}) {
 function parseFirstQueryHeader(query, parsers = {}) {
   const parsedInfo = {
     user: null,
-    tags: new Set(),
+    tags: [],
   };
 
   if (parsers?.user) {
@@ -78,8 +78,8 @@ function parseFirstQueryHeader(query, parsers = {}) {
   if (parsers?.tags) {
     const parsedTags = new RegExp(parsers.tags).exec(query);
     if (parsedTags && parsedTags[1]) {
-      const tags = JSON.parse(parsedTags[1]);
-      parsedInfo.tags.add(...tags);
+      const tags = parsedTags[1].split(",");
+      parsedInfo.tags.push(...tags);
     }
   }
 
