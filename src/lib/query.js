@@ -30,16 +30,24 @@ async function getFirstQueryByTraceId(traceId) {
     .first();
 }
 
-async function getAssumedUserForTrace(traceId) {
-  const cachedUser = await cache.get(traceId);
-  if (cachedUser) {
-    return cachedUser;
+async function getQueryHeaderInfo(traceId) {
+  if (!traceId) {
+    return null;
   }
 
-  const previousQuery = await getFirstQueryByTraceId(traceId);
-  if (previousQuery) {
-    return previousQuery.assumed_user || previousQuery.user;
+  const cachedHeaderData = cache.get(traceId);
+  if (cachedHeaderData) {
+    return cachedHeaderData;
   }
+
+  const firstQueryInTrace = await getFirstQueryByTraceId(traceId);
+  if (firstQueryInTrace) {
+    return {
+      user: firstQueryInTrace.assumed_user || firstQueryInTrace.user,
+      tags: firstQueryInTrace.tags || [],
+    };
+  }
+
   return null;
 }
 
@@ -54,9 +62,34 @@ async function updateQuery(queryId, data = {}) {
   stats.increment("query_updated", [`status:${data.status}`]);
 }
 
+function parseFirstQueryHeader(query, parsers = {}) {
+  const parsedInfo = {
+    user: null,
+    tags: [],
+  };
+
+  if (parsers?.user) {
+    const parsedUser = new RegExp(parsers.user).exec(query);
+    if (parsedUser) {
+      parsedInfo.user = parsedUser[1];
+    }
+  }
+
+  if (parsers?.tags) {
+    const parsedTags = new RegExp(parsers.tags).exec(query);
+    if (parsedTags && parsedTags[1]) {
+      const tags = parsedTags[1].split(",");
+      parsedInfo.tags.push(...tags);
+    }
+  }
+
+  return parsedInfo;
+}
+
 module.exports = {
-  getAssumedUserForTrace,
   getQueryById,
-  updateQuery,
+  getQueryHeaderInfo,
+  parseFirstQueryHeader,
   QUERY_STATUS,
+  updateQuery,
 };

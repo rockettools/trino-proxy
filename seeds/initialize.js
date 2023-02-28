@@ -19,6 +19,20 @@ exports.seed = async function (knex) {
     created_at: now,
   });
 
+  // Main user with headers
+  await knex("user").insert({
+    id: uuidv4(),
+    name: "main",
+    password: "{}", // no password
+    parsers: {
+      user: "-- Username: *(.*)",
+      tags: "-- Tags: *(.*)",
+    },
+    tags: "{}",
+    updated_at: now,
+    created_at: now,
+  });
+
   await knex("cluster").del();
   await knex("cluster").insert({
     id: uuidv4(),

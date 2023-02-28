@@ -1,6 +1,5 @@
 const _ = require("lodash");
-const logger = require("./logger");
-const { getAssumedUserForTrace } = require("./query");
+const { getQueryHeaderInfo } = require("./query");
 
 function getProxiedBody(clusterBody, proxyId, proxyHost) {
   const newBody = _.cloneDeep(clusterBody);
@@ -38,23 +37,18 @@ function getUsernameFromAuthorizationHeader(header) {
   }
 }
 
-async function replaceAuthorizationHeader(req) {
-  let headerUser;
-  if (req.headers["x-trino-trace-token"]) {
-    headerUser = await getAssumedUserForTrace(
-      req.headers["x-trino-trace-token"]
-    );
-  }
+async function getAuthorizationHeader(headers) {
+  const traceToken = headers["x-trino-trace-token"];
+  const headerUser = await getQueryHeaderInfo(traceToken);
+  const authorizationHeader = headerUser
+    ? "Basic " + Buffer.from(headerUser).toString("base64")
+    : null;
 
-  if (headerUser) {
-    logger.silly("Replacing authorization header", { headerUser });
-    req.headers.authorization =
-      "Basic " + Buffer.from(headerUser).toString("base64");
-  }
+  return authorizationHeader;
 }
 
 module.exports = {
+  getAuthorizationHeader,
   getProxiedBody,
   getUsernameFromAuthorizationHeader,
-  replaceAuthorizationHeader,
 };
