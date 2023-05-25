@@ -17,6 +17,7 @@ const QUERY_STATUS = {
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
   STARTING: "STARTING",
+  RESULT_SET_ROW_LIMIT: "RESULT_SET_ROW_LIMIT"
 };
 
 async function getQueryById(newQueryId) {
@@ -65,7 +66,7 @@ async function updateQuery(queryId, data = {}) {
 function parseFirstQueryHeader(query, parsers = {}) {
   const parsedInfo = {
     user: null,
-    tags: [],
+    tags: new Set(),
   };
 
   if (parsers?.user) {
@@ -78,10 +79,15 @@ function parseFirstQueryHeader(query, parsers = {}) {
   if (parsers?.tags) {
     const parsedTags = new RegExp(parsers.tags).exec(query);
     if (parsedTags && parsedTags[1]) {
-      const tags = parsedTags[1].split(",");
-      parsedInfo.tags.push(...tags);
+      const tags = parsedTags[1];//.split(",");
+      //parsedInfo.tags.push(...tags);
+      logger.info("adding tags: ", tags);
+      //parsedInfo.tags.add(...tags);
+      parsedInfo.tags.add(tags);
     }
   }
+
+  logger.info('parsedInfo: ', parsedInfo);
 
   return parsedInfo;
 }
