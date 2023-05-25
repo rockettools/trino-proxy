@@ -84,8 +84,6 @@ function parseFirstQueryHeader(query, parsers = {}) {
     }
   }
 
-  logger.info('parsedInfo: ', parsedInfo);
-
   return parsedInfo;
 }
 

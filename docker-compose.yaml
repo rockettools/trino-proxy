@@ -18,10 +18,16 @@ services:
       - HTTP_ENABLED=true
       - LOG_LEVEL=info
       - NODE_ENV=production
+      - RESULT_SET_ROW_LIMIT=500
+      - RESULT_SET_ROW_LIMIT_CLIENT_TAG=mode
 
   postgres:
     image: postgres:13
     restart: always
+    volumes:
+      - D:\dev\trino-proxy-postgres\data:/var/lib/postgresql/data
+    ports:
+      - 8082:5432
     environment:
       POSTGRES_USER: trino_proxy
       POSTGRES_PASSWORD: trino_proxy
@@ -30,5 +36,7 @@ services:
   trino:
     image: trinodb/trino
     restart: always
+    volumes:
+      - d:\dev\trino:/etc/trino
     ports:
       - 8081:8080
