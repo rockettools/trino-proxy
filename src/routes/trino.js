@@ -213,24 +213,6 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
                     errorCode: -1,
                     errorName: "RESULT_SET_ROW_LIMIT",
                     errorType: "EXTERNAL",
-                    failureInfo: {
-                        cause: {
-                            cause: {
-                                message: errorMessage,
-                                stack: [],
-                                suppressed: [],
-                                type: "data row limit reached"
-                            },
-                            message: errorMessage,
-                            stack: [],
-                            suppressed: [],
-                            type: "data row limit reached"
-                        },
-                        message: errorMessage,
-                        stack: [],
-                        suppressed: [],
-                        type: "data row limit reached"
-                    },
                     "message": errorMessage
                 }
 

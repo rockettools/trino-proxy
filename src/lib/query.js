@@ -7,6 +7,7 @@ const QUERY_STATUS = {
   // Trino Proxy states
   AWAITING_SCHEDULING: "AWAITING_SCHEDULING",
   CANCELLED: "CANCELLED",
+  RESULT_SET_ROW_LIMIT: "RESULT_SET_ROW_LIMIT",
   // Trino states
   BLOCKED: "BLOCKED",
   FAILED: "FAILED",
@@ -16,8 +17,7 @@ const QUERY_STATUS = {
   PLANNING: "PLANNING",
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
-  STARTING: "STARTING",
-  RESULT_SET_ROW_LIMIT: "RESULT_SET_ROW_LIMIT"
+  STARTING: "STARTING"
 };
 
 async function getQueryById(newQueryId) {
@@ -66,7 +66,7 @@ async function updateQuery(queryId, data = {}) {
 function parseFirstQueryHeader(query, parsers = {}) {
   const parsedInfo = {
     user: null,
-    tags: new Set(),
+    tags: [],
   };
 
   if (parsers?.user) {
