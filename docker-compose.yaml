@@ -18,14 +18,10 @@ services:
       - HTTP_ENABLED=true
       - LOG_LEVEL=info
       - NODE_ENV=production
-      - RESULT_SET_ROW_LIMIT=500
-      - RESULT_SET_ROW_LIMIT_CLIENT_TAG=mode
 
   postgres:
     image: postgres:13
     restart: always
-    ports:
-      - 8082:5432
     environment:
       POSTGRES_USER: trino_proxy
       POSTGRES_PASSWORD: trino_proxy
