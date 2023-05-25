@@ -191,16 +191,14 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
         data: response?.data
       });
 
-      // if the query is running and has returned data, check the user options to see if the user is row count limited
-      // if yes, trim the data and return an error
-
       if (response?.data?.stats?.state === QUERY_STATUS.RUNNING) {
         if (response.data.data) {
-            // Evaluate query user options and evaluate if the user is row count limited and return an error if the user is limited and the result set rowcount is larger than allowed
             const queryUser = await knex("user")
                  .where({ id: query.user })
                  .first();
 
+            // Evaluate the query's user's options and evaluate if the user is row count limited
+            // Return an error if the user is limited and the result set rowcount is larger than allowed
             if (queryUser.options?.isRowLimited && response.data.data.length > queryUser.options?.rowLimitCount) {
                 const errorMessage = "Result set size of " + response.data.data.length + " is larger than the maximum rows of " + queryUser.options?.rowLimitCount;
 
@@ -216,7 +214,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
                     "message": errorMessage
                 }
 
-                // Update the query in the Trino Proxy DB to specify the user options row limit was reached
+                // Update the query to specify the user options row limit was reached
                 await updateQuery(query.id, {
                     status: QUERY_STATUS.RESULT_SET_ROW_LIMIT,
                     next_uri: response.data.nextUri || null,
