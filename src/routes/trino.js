@@ -21,8 +21,6 @@ const router = express.Router();
 const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
 const MOCKED_QUERY_KEY_ID = "AWAITING_SCHEDULING";
 const MOCKED_QUERY_NUM = "0";
-const RESULT_SET_ROW_LIMIT = parseInt(process.env.RESULT_SET_ROW_LIMIT) || 500;
-const RESULT_SET_ROW_LIMIT_CLIENT_TAG = process.env.RESULT_SET_ROW_LIMIT_CLIENT_TAG || "mode";
 
 function getHost(req) {
   const host = req.get("host");
@@ -193,35 +191,24 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
         data: response?.data
       });
 
-      // if the query is running and has returned data, look to see if it is coming from Mode and contains a large result set
-      // if yes, trim the data and return an error.  Large datasets should not be returned to Mode as it eats up our quota and is very costly
+      // if the query is running and has returned data, check the user options to see if the user is row count limited
+      // if yes, trim the data and return an error
 
       if (response?.data?.stats?.state === QUERY_STATUS.RUNNING) {
         if (response.data.data) {
-            logger.info("Data returned from Trino:", {
-                state: response.data.stats.state,
-                rowcount: response.data.data.length,
-                processedRows: response.data.stats.processedRows,
-                tags: query.tags,
-                filterTag: RESULT_SET_ROW_LIMIT_CLIENT_TAG
-            })
+            // Evaluate query user options and evaluate if the user is row count limited and return an error if the user is limited and the result set rowcount is larger than allowed
+            const queryUser = await knex("user")
+                 .where({ id: query.user })
+                 .first();
 
-            // Evaluate result set size and look for client tag of Mode to only throw an error if a large result set to be returned to Mode
-
-            if (response.data.data.length > RESULT_SET_ROW_LIMIT && query.tags !==  null && new Set(query.tags).has(RESULT_SET_ROW_LIMIT_CLIENT_TAG)) {
-                logger.info("tags length: ", { tagLength: query.tags.length });
-                logger.info("Result set too large.  Failing query: ", {
-                    tags: query.tags
-                });
-
-                var errorMessage = "Result set size of " + response.data.data.length + " is larger than the maximum rows of " + RESULT_SET_ROW_LIMIT;
+            if (queryUser.options?.isRowLimited && response.data.data.length > queryUser.options?.rowLimitCount) {
+                const errorMessage = "Result set size of " + response.data.data.length + " is larger than the maximum rows of " + queryUser.options?.rowLimitCount;
 
                 response.data.stats.state = QUERY_STATUS.FAILED;
                 response.data.nextUri = null;
                 response.data.data = null;
 
                 // Create new error return to tell Trino client the error failed
-
                 response.data.error = {
                     errorCode: -1,
                     errorName: "RESULT_SET_ROW_LIMIT",
@@ -247,7 +234,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
                     "message": errorMessage
                 }
 
-                // Update the query in the Trino Proxy DB to specify the row limit was reached
+                // Update the query in the Trino Proxy DB to specify the user options row limit was reached
                 await updateQuery(query.id, {
                     status: QUERY_STATUS.RESULT_SET_ROW_LIMIT,
                     next_uri: response.data.nextUri || null,
@@ -270,8 +257,6 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
 
       const returnHeaders = getTrinoHeaders(response.headers);
       const returnBody = getProxiedBody(response.data, queryId, getHost(req));
-
-      logger.debug("returning to client", { state: response.data.stats.state, rows: response.data.stats.processedRows});
 
       return res.status(200).set(returnHeaders).json(returnBody);
     } catch (err) {

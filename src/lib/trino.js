@@ -5,7 +5,7 @@ const { CLUSTER_STATUS } = require("../lib/cluster");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const stats = require("../lib/stats");
-const { QUERY_STATUS, updateQuery } = require("../lib/query");
+const { QUERY_STATUS } = require("../lib/query");
 
 let schedulerRunning = false;
 const SCHEDULER_DELAY_MS = 1000 * 15;
@@ -100,11 +100,6 @@ async function scheduleQueries() {
               "X-Trino-Client-Tags": Array.from(clientTags).join(","),
             },
             data: query.body
-          });
-
-          logger.debug("Response from Trino: ", {
-            queryId: query.id,
-            state: response?.data?.stats?.state
           });
 
           await knex("query")

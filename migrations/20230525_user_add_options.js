@@ -3,8 +3,8 @@
  * @returns { Promise<void> }
  */
 exports.up = function (knex) {
-  return knex.schema.alterTable("query", (table) => {
-    table.specificType("stats", "jsonb");
+  return knex.schema.alterTable("user", (table) => {
+    table.specificType("options", "jsonb");
   });
 };
 
@@ -13,7 +13,7 @@ exports.up = function (knex) {
  * @returns { Promise<void> }
  */
 exports.down = function (knex) {
-  return knex.schema.alterTable("query", (table) => {
-    table.dropColumn("stats");
+  return knex.schema.alterTable("user", (table) => {
+    table.dropColumn("options");
   });
 };
