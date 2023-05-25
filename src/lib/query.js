@@ -79,10 +79,7 @@ function parseFirstQueryHeader(query, parsers = {}) {
   if (parsers?.tags) {
     const parsedTags = new RegExp(parsers.tags).exec(query);
     if (parsedTags && parsedTags[1]) {
-      const tags = parsedTags[1];//.split(",");
-      //parsedInfo.tags.push(...tags);
-      logger.info("adding tags: ", tags);
-      //parsedInfo.tags.add(...tags);
+      const tags = parsedTags[1];
       parsedInfo.tags.add(tags);
     }
   }
