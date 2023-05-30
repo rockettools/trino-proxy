@@ -8,6 +8,7 @@ const QUERY_STATUS = {
   AWAITING_SCHEDULING: "AWAITING_SCHEDULING",
   CANCELLED: "CANCELLED",
   RESULT_SET_ROW_LIMIT: "RESULT_SET_ROW_LIMIT",
+  MAX_DOWNLOAD_BYTES_LIMIT: "MAX_DOWNLOAD_BYTES_LIMIT",
   // Trino states
   BLOCKED: "BLOCKED",
   FAILED: "FAILED",
@@ -17,7 +18,7 @@ const QUERY_STATUS = {
   PLANNING: "PLANNING",
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
-  STARTING: "STARTING"
+  STARTING: "STARTING",
 };
 
 async function getQueryById(newQueryId) {
@@ -79,8 +80,8 @@ function parseFirstQueryHeader(query, parsers = {}) {
   if (parsers?.tags) {
     const parsedTags = new RegExp(parsers.tags).exec(query);
     if (parsedTags && parsedTags[1]) {
-      const tags = parsedTags[1];
-      parsedInfo.tags.add(tags);
+      const tags = parsedTags[1].split(",");
+      parsedInfo.tags.push(...tags);
     }
   }
 

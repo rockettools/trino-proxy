@@ -188,51 +188,79 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
 
       logger.debug("Response from Trino: ", {
         state: response?.data?.stats?.state,
-        data: response?.data
+        data: response?.data,
       });
 
-      if (response?.data?.stats?.state === QUERY_STATUS.RUNNING) {
-        if (response.data.data) {
-            const queryUser = await knex("user")
-                 .where({ id: query.user })
-                 .first();
+      if (
+        response?.data?.stats?.state === QUERY_STATUS.RUNNING &&
+        response.data.data
+      ) {
+        const queryUser = await knex("user").where({ id: query.user }).first();
 
-            // Evaluate the query's user's options and evaluate if the user is row count limited
-            // Return an error if the user is limited and the result set rowcount is larger than allowed
-            if (queryUser.options?.isRowLimited && response.data.data.length > queryUser.options?.rowLimitCount) {
-                const errorMessage = "Result set size of " + response.data.data.length + " is larger than the maximum rows of " + queryUser.options?.rowLimitCount;
+        let errorMessage = null;
+        let errorName = null;
 
-                response.data.stats.state = QUERY_STATUS.FAILED;
-                response.data.nextUri = null;
-                response.data.data = null;
+        // Evaluate the query's user's options and evaluate if the user is max download bytes limited
+        // Return an error if the user is limited and the result set data set size is larger than allowed
+        if (
+          queryUser.options?.maxDownloadBytes &&
+          JSON.stringify(response.data.data).length >
+            queryUser.options?.maxDownloadBytes
+        ) {
+          errorMessage = `Download size of ${
+            JSON.stringify(response.data.data).length
+          } is larger than the maximum number of bytes of ${
+            queryUser.options?.maxDownloadBytes
+          }`;
+          errorName = QUERY_STATUS.MAX_DOWNLOAD_BYTES_LIMIT;
+        }
 
-                // Create new error return to tell Trino client the error failed
-                response.data.error = {
-                    errorCode: -1,
-                    errorName: "RESULT_SET_ROW_LIMIT",
-                    errorType: "EXTERNAL",
-                    "message": errorMessage
-                }
+        // Evaluate the query's user's options and evaluate if the user is row count limited
+        // Return an error if the user is limited and the result set rowcount is larger than allowed
+        if (
+          !errorName &&
+          queryUser.options?.rowLimitCount &&
+          response.data.data.length > queryUser.options?.rowLimitCount
+        ) {
+          errorMessage = `Result set size of ${response.data.data.length} is larger than the maximum rows of ${queryUser.options?.rowLimitCount}`;
+          errorName = QUERY_STATUS.RESULT_SET_ROW_LIMIT;
+        }
 
-                // Update the query to specify the user options row limit was reached
-                await updateQuery(query.id, {
-                    status: QUERY_STATUS.RESULT_SET_ROW_LIMIT,
-                    next_uri: response.data.nextUri || null,
-                    stats: response.data.stats
-                  });
+        if (errorName) {
+          response.data.stats.state = QUERY_STATUS.FAILED;
+          response.data.nextUri = null;
+          response.data.data = null;
 
-                const returnHeaders = getTrinoHeaders(response.headers);
-                const returnBody = getProxiedBody(response.data, queryId, getHost(req));
+          // Create new error return to tell Trino client the error failed
+          response.data.error = {
+            errorCode: -1,
+            errorName: errorName,
+            errorType: "EXTERNAL",
+            message: errorMessage,
+          };
 
-                return res.status(200).set(returnHeaders).json(returnBody);
-            }
+          // Update the query to specify a user options limit was reached
+          await updateQuery(query.id, {
+            status: errorName,
+            next_uri: null,
+            stats: response.data.stats,
+          });
+
+          const returnHeaders = getTrinoHeaders(response.headers);
+          const returnBody = getProxiedBody(
+            response.data,
+            queryId,
+            getHost(req)
+          );
+
+          return res.status(200).set(returnHeaders).json(returnBody);
         }
       }
 
       await updateQuery(query.id, {
         status: response.data?.stats?.state,
         next_uri: response.data.nextUri || null,
-        stats: response.data.stats
+        stats: response.data.stats,
       });
 
       const returnHeaders = getTrinoHeaders(response.headers);
@@ -252,7 +280,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
         return res.status(404).json({ error: "Query not found on cluster" });
       }
 
-      return res.status(500).json({ error: err});
+      throw err;
     }
   } catch (err) {
     logger.error("Error getting statement status", err, { params: req.params });
