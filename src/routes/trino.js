@@ -195,6 +195,25 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
         response?.data?.stats?.state === QUERY_STATUS.RUNNING &&
         response.data.data
       ) {
+        const queryBytes = JSON.stringify(response.data.data).length;
+
+        // Update query total rows and total bytes
+        query.total_rows =
+          query.total_rows === null
+            ? response.data.data.length
+            : query.total_rows + response.data.data.length;
+        query.total_bytes =
+          query.total_bytes === null
+            ? queryBytes
+            : BigInt(queryBytes) + BigInt(query.total_bytes);
+
+        logger.debug("Return data: ", {
+          rows: response.data.data.length,
+          total_rows: query.total_rows,
+          bytes: queryBytes,
+          total_bytes: query.total_bytes,
+        });
+
         const queryUser = await knex("user").where({ id: query.user }).first();
 
         let errorMessage = null;
@@ -204,14 +223,9 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
         // Return an error if the user is limited and the result set data set size is larger than allowed
         if (
           queryUser.options?.maxDownloadBytes &&
-          JSON.stringify(response.data.data).length >
-            queryUser.options?.maxDownloadBytes
+          query.total_bytes > queryUser.options?.maxDownloadBytes
         ) {
-          errorMessage = `Download size of ${
-            JSON.stringify(response.data.data).length
-          } is larger than the maximum number of bytes of ${
-            queryUser.options?.maxDownloadBytes
-          }`;
+          errorMessage = `Download size of ${query.total_bytes} is larger than the maximum number of bytes of ${queryUser.options?.maxDownloadBytes}`;
           errorName = QUERY_STATUS.MAX_DOWNLOAD_BYTES_LIMIT;
         }
 
@@ -220,9 +234,9 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
         if (
           !errorName &&
           queryUser.options?.rowLimitCount &&
-          response.data.data.length > queryUser.options?.rowLimitCount
+          query.total_rows > queryUser.options?.rowLimitCount
         ) {
-          errorMessage = `Result set size of ${response.data.data.length} is larger than the maximum rows of ${queryUser.options?.rowLimitCount}`;
+          errorMessage = `Result set size of ${query.total_rows} is larger than the maximum rows of ${queryUser.options?.rowLimitCount}`;
           errorName = QUERY_STATUS.RESULT_SET_ROW_LIMIT;
         }
 
@@ -244,6 +258,9 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
             status: errorName,
             next_uri: null,
             stats: response.data.stats,
+            error_info: response.data.error,
+            total_rows: query.total_rows,
+            total_bytes: query.total_bytes,
           });
 
           const returnHeaders = getTrinoHeaders(response.headers);
@@ -257,10 +274,19 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
         }
       }
 
+      const errorInfo =
+        response.data?.stats?.state === QUERY_STATUS.FAILED &&
+        response.data?.error
+          ? response.data.error
+          : null;
+
       await updateQuery(query.id, {
         status: response.data?.stats?.state,
         next_uri: response.data.nextUri || null,
         stats: response.data.stats,
+        error_info: errorInfo,
+        total_rows: query.total_rows,
+        total_bytes: query.total_bytes,
       });
 
       const returnHeaders = getTrinoHeaders(response.headers);
