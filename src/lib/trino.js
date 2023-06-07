@@ -99,7 +99,7 @@ async function scheduleQueries() {
               "X-Trino-Source": source,
               "X-Trino-Client-Tags": Array.from(clientTags).join(","),
             },
-            data: query.body,
+            data: query.body
           });
 
           await knex("query")
@@ -110,9 +110,10 @@ async function scheduleQueries() {
               cluster_id: cluster.id,
               status: response.data?.stats?.state || QUERY_STATUS.QUEUED,
               next_uri: response.data?.nextUri || null,
+              stats: response.data.stats
             });
 
-          logger.info("Submitted query to Trino cluster", {
+          logger.debug("Submitted query to Trino cluster", {
             queryId: query.id,
             cluster: cluster.name,
             user,
