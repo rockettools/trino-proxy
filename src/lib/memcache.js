@@ -1,9 +1,9 @@
-const LRU = require("lru-cache");
+const { LRUCache } = require("lru-cache");
 
 const maxCacheSize = process.env.TRACE_CACHE_SIZE
   ? parseInt(process.env.TRACE_CACHE_SIZE)
-  : 100;
+  : 1000;
 
-module.exports = new LRU({
+module.exports = new LRUCache({
   max: maxCacheSize,
 });
