@@ -2,7 +2,7 @@ const uuidv4 = require("uuid").v4;
 const zod = require("zod");
 const express = require("express");
 
-const { CLUSTER_STATUS } = require("../lib/cluster");
+const { CLUSTER_STATUS } = require("../lib/trino");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 

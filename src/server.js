@@ -30,7 +30,7 @@ app.use(authenticationMiddleware);
 app.use((req, _res, next) => {
   logger.debug(
     "Request data",
-    _.pick(req, ["url", "body", "params", "query", "rawHeaders"])
+    _.pick(req, ["url", "body", "params", "query", "rawHeaders"]),
   );
   next();
 });

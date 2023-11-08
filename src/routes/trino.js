@@ -109,7 +109,7 @@ router.post("/v1/statement", async (req, res) => {
         },
       },
       newQueryId,
-      getHost(req)
+      getHost(req),
     );
     return res.status(200).json(returnBody);
   } catch (err) {
@@ -148,7 +148,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
           },
         },
         query.id,
-        getHost(req)
+        getHost(req),
       );
       return res.status(200).json(returnBody);
     }
@@ -166,7 +166,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
           },
         },
         query.id,
-        getHost(req)
+        getHost(req),
       );
       return res.status(200).json(returnBody);
     }
@@ -267,7 +267,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
           const returnBody = getProxiedBody(
             response.data,
             queryId,
-            getHost(req)
+            getHost(req),
           );
 
           return res.status(200).set(returnHeaders).json(returnBody);

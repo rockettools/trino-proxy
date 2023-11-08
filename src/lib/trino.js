@@ -1,11 +1,15 @@
 const axios = require("axios").default;
 const bluebird = require("bluebird");
 
-const { CLUSTER_STATUS } = require("../lib/cluster");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
+
+const CLUSTER_STATUS = {
+  ENABLED: "ENABLED",
+  DISABLED: "DISABLED",
+};
 
 let schedulerRunning = false;
 const SCHEDULER_DELAY_MS = 1000 * 15;
@@ -40,7 +44,7 @@ async function scheduleQueries() {
           `healthy:${clusterHealthy}`,
         ]);
         return clusterHealthy;
-      }
+      },
     );
 
     stats.increment("available_clusters", availableClusters.length);
@@ -99,7 +103,7 @@ async function scheduleQueries() {
               "X-Trino-Source": source,
               "X-Trino-Client-Tags": Array.from(clientTags).join(","),
             },
-            data: query.body
+            data: query.body,
           });
 
           await knex("query")
@@ -110,7 +114,7 @@ async function scheduleQueries() {
               cluster_id: cluster.id,
               status: response.data?.stats?.state || QUERY_STATUS.QUEUED,
               next_uri: response.data?.nextUri || null,
-              stats: response.data.stats
+              stats: response.data.stats,
             });
 
           logger.debug("Submitted query to Trino cluster", {
@@ -173,4 +177,5 @@ setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 
 module.exports = {
   scheduleQueries,
+  CLUSTER_STATUS,
 };
