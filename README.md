@@ -48,6 +48,9 @@ make format
 - HTTPS_ENABLED: whether HTTPS server is enabled (set to true)
 - HTTPS_KEY: HTTPS private key
 - HTTPS_LISTEN_PORT: HTTPS port (default: 8443)
+- KNEX_POOL_MIN: Knex connection pool minimum (default: 0)
+- KNEX_POOL_MAX: Knex connection pool minimum (default: 10)
+- KNEX_CONNECTION_TIMEOUT: Knex connection timeout (default: 10 seconds)
 - LOG_LEVEL: log level (default: info)
 - NODE_ENV: development or production
 - STATSD_HOST: statsd agent host (default: localhost)
