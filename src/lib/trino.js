@@ -1,15 +1,74 @@
 const axios = require("axios").default;
 const bluebird = require("bluebird");
 
-const { CLUSTER_STATUS } = require("../lib/cluster");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
 
+const CLUSTER_STATUS = {
+  ENABLED: "ENABLED",
+  DISABLED: "DISABLED",
+};
+
 let schedulerRunning = false;
 const SCHEDULER_DELAY_MS = 1000 * 15;
-const MAX_QUERIES_QUEUED = 5;
+const MAX_QUERIES_QUEUED = 10;
+
+/**
+ * Checks that the Trino cluster is finished initializing.
+ * The Trino http server starts before queries are ready to be queued, causing them to fail.
+ * This function throws an error if the cluster is is not accessible or is initializing.
+ *
+ * TODO: improve this to cache the server status or prefetch it to minimize time between
+ * trino-proxy accepting a new query and it being passed off to a Trino cluster.
+ */
+async function isClusterHealthy(clusterBaseUrl) {
+  if (!clusterBaseUrl) {
+    throw new Error("Missing clusterBaseUrl");
+  }
+
+  try {
+    const infoResponse = await axios({
+      url: `${clusterBaseUrl}/v1/info`,
+      method: "get",
+    });
+
+    // Cluster is healthy if `starting` property is false
+    const isHealthy = infoResponse.data && infoResponse.data.starting === false;
+    return isHealthy;
+  } catch (err) {
+    logger.error("Error checking cluster health", err, {
+      clusterBaseUrl,
+    });
+    return false;
+  }
+}
+
+/**
+ * Gets all available and healthy Trino clusters.
+ */
+async function getAvailableClusters() {
+  const enabledClusters = await knex("cluster").where({
+    status: CLUSTER_STATUS.ENABLED,
+  });
+
+  // Filter to only clusters that are healthy and ready for queries
+  const availableClusters = await bluebird.filter(
+    enabledClusters,
+    async (cluster) => {
+      const clusterHealthy = await isClusterHealthy(cluster.url);
+      stats.increment("check_cluster_health", [
+        `cluster:${cluster.name}`,
+        `healthy:${clusterHealthy}`,
+      ]);
+      return clusterHealthy;
+    },
+  );
+
+  stats.gauge("available_clusters", availableClusters.length);
+  return availableClusters;
+}
 
 async function scheduleQueries() {
   if (schedulerRunning) return;
@@ -23,31 +82,12 @@ async function scheduleQueries() {
     // Increment number of pending queries for monitoring
     // If there are none, just early exit to prevent the extra db calls
     const numberQueriesPending = parseInt(queriesToSchedule[0].count) || 0;
-    stats.increment("queries_waiting_scheduling", numberQueriesPending);
+    stats.gauge("queries_waiting_scheduling", numberQueriesPending);
     if (numberQueriesPending === 0) return;
 
-    const enabledClusters = await knex("cluster").where({
-      status: CLUSTER_STATUS.ENABLED,
-    });
-
-    // Filter to only clusters that are healthy and ready for queries
-    const availableClusters = await bluebird.filter(
-      enabledClusters,
-      async (cluster) => {
-        const clusterHealthy = await isClusterHealthy(cluster.url);
-        stats.increment("check_cluster_health", [
-          `cluster:${cluster.name}`,
-          `healthy:${clusterHealthy}`,
-        ]);
-        return clusterHealthy;
-      }
-    );
-
-    stats.increment("available_clusters", availableClusters.length);
+    const availableClusters = await getAvailableClusters();
     if (availableClusters.length === 0) {
-      logger.error("No healthy clusters available", {
-        enabled: enabledClusters.length,
-      });
+      logger.error("No healthy clusters available");
       return;
     }
 
@@ -99,7 +139,7 @@ async function scheduleQueries() {
               "X-Trino-Source": source,
               "X-Trino-Client-Tags": Array.from(clientTags).join(","),
             },
-            data: query.body
+            data: query.body,
           });
 
           await knex("query")
@@ -110,7 +150,7 @@ async function scheduleQueries() {
               cluster_id: cluster.id,
               status: response.data?.stats?.state || QUERY_STATUS.QUEUED,
               next_uri: response.data?.nextUri || null,
-              stats: response.data.stats
+              stats: response.data.stats,
             });
 
           logger.debug("Submitted query to Trino cluster", {
@@ -140,29 +180,6 @@ async function scheduleQueries() {
   }
 }
 
-/**
- * Checks that the Trino cluster is finished initializing. It appears that the http server starts
- * accepting queries before they're able to be queued, causing them to fail seconds later.
- * This function throws an error if the cluster is is not accessible or is initializing.
- *
- * TODO: improve this to cache the server status or prefetch it to minimize time between
- * trino-proxy accepting a new query and it being passed off to a Trino cluster.
- */
-async function isClusterHealthy(clusterBaseUrl) {
-  try {
-    const response = await axios({
-      url: `${clusterBaseUrl}/v1/info`,
-      method: "get",
-    });
-
-    // Cluster is healthy if `starting` property is false
-    return response.data && response.data.starting === false;
-  } catch (err) {
-    logger.error("Error checking cluster health", err, { clusterBaseUrl });
-    return false;
-  }
-}
-
 async function runSchedulerAndReschedule() {
   await scheduleQueries();
   setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
@@ -173,4 +190,5 @@ setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 
 module.exports = {
   scheduleQueries,
+  CLUSTER_STATUS,
 };

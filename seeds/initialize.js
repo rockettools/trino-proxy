@@ -1,5 +1,5 @@
 const uuidv4 = require("uuid").v4;
-const { CLUSTER_STATUS } = require("../src/lib/cluster");
+const { CLUSTER_STATUS } = require("../src/lib/trino");
 
 const now = new Date();
 

@@ -3,7 +3,7 @@ const { getQueryHeaderInfo } = require("./query");
 
 function getProxiedBody(clusterBody, proxyId, proxyHost) {
   const newBody = _.cloneDeep(clusterBody);
-  // Save cluser's queryId for string replacement
+  // Save cluster's queryId for string replacement
   const clusterQueryId = newBody.id;
   // Overwrite cluster's queryId with that of trino-proxy
   newBody.id = proxyId;
@@ -25,18 +25,6 @@ function getProxiedBody(clusterBody, proxyId, proxyHost) {
   return newBody;
 }
 
-function getUsernameFromAuthorizationHeader(header) {
-  if (header) {
-    if (typeof header === "string") {
-      header = [header];
-    }
-    for (let idx = 0; idx < header.length; idx++) {
-      if (header[idx].indexOf("Basic ") === 0)
-        return Buffer.from(header[idx].split(" ")[1], "base64").toString();
-    }
-  }
-}
-
 async function getAuthorizationHeader(headers) {
   const traceToken = headers["x-trino-trace-token"];
   const headerUser = await getQueryHeaderInfo(traceToken);
@@ -50,5 +38,4 @@ async function getAuthorizationHeader(headers) {
 module.exports = {
   getAuthorizationHeader,
   getProxiedBody,
-  getUsernameFromAuthorizationHeader,
 };

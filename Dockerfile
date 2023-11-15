@@ -1,10 +1,10 @@
-FROM node:16-buster AS builder
+FROM node:18-buster AS builder
 WORKDIR  /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --production
 
 # Distroless production image
-FROM gcr.io/distroless/nodejs:16
+FROM gcr.io/distroless/nodejs:18
 WORKDIR /app
 COPY --from=builder /app/node_modules /app/node_modules
 COPY src /app/src
