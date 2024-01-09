@@ -6,8 +6,8 @@
   "private": true,
   "license": "ISC",
   "scripts": {
-    "format": "prettier --write src",
-    "lint": "eslint --fix src",
+    "format": "prettier --write .",
+    "lint": "eslint --fix .",
     "prepare": "husky install"
   },
   "engines": {
