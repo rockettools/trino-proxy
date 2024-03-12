@@ -79,3 +79,5 @@ if (!HTTPS_ENABLED || HTTP_ENABLED) {
   httpServer.listen(HTTP_LISTEN_PORT);
   logger.info(`HTTP server listen on port ${HTTP_LISTEN_PORT}`);
 }
+
+logger.info('Routing method: ' + process.env.ROUTING_METHOD);

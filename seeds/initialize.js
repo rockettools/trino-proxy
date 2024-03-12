@@ -42,4 +42,12 @@ exports.seed = async function (knex) {
     updated_at: now,
     created_at: now,
   });
+  await knex("cluster").insert({
+      id: uuidv4(),
+      name: "trino2",
+      url: "http://trino2:8080",
+      status: CLUSTER_STATUS.ENABLED,
+      updated_at: now,
+      created_at: now,
+    });
 };

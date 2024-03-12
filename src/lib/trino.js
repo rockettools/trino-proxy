@@ -85,7 +85,7 @@ async function scheduleQueries() {
     stats.gauge("queries_waiting_scheduling", numberQueriesPending);
     if (numberQueriesPending === 0) return;
 
-    const availableClusters = await getAvailableClusters();
+    var availableClusters = await getAvailableClusters();
     if (availableClusters.length === 0) {
       logger.error("No healthy clusters available");
       return;
@@ -114,8 +114,36 @@ async function scheduleQueries() {
 
           // Simple distribution of queries across all clusters
           // TODO: Could improve this based on given weights or cluster size
-          const cluster = availableClusters[currentClusterId];
+
+          var cluster = availableClusters[currentClusterId];
           currentClusterId = (currentClusterId + 1) % availableClusters.length;
+
+          if (process.env.ROUTING_METHOD != null && process.env.ROUTING_METHOD === 'LOAD') {
+                logger.debug("Load based routing");
+
+                for (i in availableClusters) {
+                    const statsResponse = await axios({
+                      url: `${availableClusters[i].url}/ui/api/stats`,
+                      method: "get",
+                    });
+
+                    availableClusters[i].runningQueries = statsResponse.data.runningQueries;
+                    availableClusters[i].queuedQueries = statsResponse.data.queuedQueries;
+                    availableClusters[i].blockedQueries = statsResponse.data.blockedQueries;
+
+                    logger.debug("Cluster: " + JSON.stringify(availableClusters[i]));
+                }
+
+                logger.debug("sorting clusters based on load");
+
+                const sortedClusters = availableClusters.sort(compareByLoad);
+
+                logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
+
+                cluster = sortedClusters[0];
+
+                logger.debug("Submitting to cluster: " + JSON.stringify(cluster));
+          }
 
           const user = query.assumed_user || query.user;
           const source = query.source || "trino-proxy";
@@ -178,6 +206,21 @@ async function scheduleQueries() {
     stats.timing("scheduler.timing", new Date() - startTime);
     schedulerRunning = false;
   }
+}
+
+function compareByLoad(a, b) {
+    var queryDiff = a.runningQueries - b.runningQueries;
+
+    if (queryDiff === 0) {
+        var queueDiff = a.queuedQueries - b.queuedQueries;
+
+        if (queueDiff === 0)
+            return a.blockedQueries - b.blockedQueries;
+
+        return queueDiff;
+    }
+
+    return queryDiff;
 }
 
 async function runSchedulerAndReschedule() {
