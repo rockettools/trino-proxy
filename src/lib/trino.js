@@ -6,6 +6,8 @@ const logger = require("../lib/logger");
 const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
 
+const ROUTING_METHOD = process.env.ROUTING_METHOD || "ROUND_ROBIN";
+
 const CLUSTER_STATUS = {
   ENABLED: "ENABLED",
   DISABLED: "DISABLED",
@@ -115,35 +117,8 @@ async function scheduleQueries() {
           // Simple distribution of queries across all clusters
           // TODO: Could improve this based on given weights or cluster size
 
-          var cluster = availableClusters[currentClusterId];
+          const cluster = await getCluster(availableClusters, currentClusterId);
           currentClusterId = (currentClusterId + 1) % availableClusters.length;
-
-          if (process.env.ROUTING_METHOD != null && process.env.ROUTING_METHOD === 'LOAD') {
-                logger.debug("Load based routing");
-
-                for (i in availableClusters) {
-                    const statsResponse = await axios({
-                      url: `${availableClusters[i].url}/ui/api/stats`,
-                      method: "get",
-                    });
-
-                    availableClusters[i].runningQueries = statsResponse.data.runningQueries;
-                    availableClusters[i].queuedQueries = statsResponse.data.queuedQueries;
-                    availableClusters[i].blockedQueries = statsResponse.data.blockedQueries;
-
-                    logger.debug("Cluster: " + JSON.stringify(availableClusters[i]));
-                }
-
-                logger.debug("sorting clusters based on load");
-
-                const sortedClusters = availableClusters.sort(compareByLoad);
-
-                logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
-
-                cluster = sortedClusters[0];
-
-                logger.debug("Submitting to cluster: " + JSON.stringify(cluster));
-          }
 
           const user = query.assumed_user || query.user;
           const source = query.source || "trino-proxy";
@@ -208,19 +183,44 @@ async function scheduleQueries() {
   }
 }
 
+async function getCluster(availableClusters, currentClusterId) {
+  logger.debug("Routing Method: " + ROUTING_METHOD);
+
+  if (ROUTING_METHOD === "ROUND_ROBIN")
+    return availableClusters[currentClusterId];
+
+  if (ROUTING_METHOD === 'LOAD') {
+        logger.debug("Load based routing");
+
+        for (const cluster of availableClusters) {
+            const statsResponse = await axios({
+              url: `${cluster.url}/ui/api/stats`,
+              method: "get",
+            });
+
+            cluster.runningQueries = statsResponse.data.runningQueries;
+            cluster.queuedQueries = statsResponse.data.queuedQueries;
+            cluster.blockedQueries = statsResponse.data.blockedQueries;
+
+            logger.debug("Available cluster: " + JSON.stringify(cluster));
+        }
+
+        logger.debug("sorting clusters based on load");
+
+        const sortedClusters = availableClusters.sort(compareByLoad);
+
+        logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
+
+        let cluster = sortedClusters[0];
+
+        logger.debug("Submitting to cluster: " + JSON.stringify(cluster));
+
+        return cluster;
+  }
+}
+
 function compareByLoad(a, b) {
-    var queryDiff = a.runningQueries - b.runningQueries;
-
-    if (queryDiff === 0) {
-        var queueDiff = a.queuedQueries - b.queuedQueries;
-
-        if (queueDiff === 0)
-            return a.blockedQueries - b.blockedQueries;
-
-        return queueDiff;
-    }
-
-    return queryDiff;
+    return a.runningQueries - b.runningQueries || a.queuedQueries - b.queuedQueries || a.blockedQueries - b.blockedQueries;
 }
 
 async function runSchedulerAndReschedule() {
