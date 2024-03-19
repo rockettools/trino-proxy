@@ -87,7 +87,7 @@ async function scheduleQueries() {
     stats.gauge("queries_waiting_scheduling", numberQueriesPending);
     if (numberQueriesPending === 0) return;
 
-    var availableClusters = await getAvailableClusters();
+    const availableClusters = await getAvailableClusters();
     if (availableClusters.length === 0) {
       logger.error("No healthy clusters available");
       return;
