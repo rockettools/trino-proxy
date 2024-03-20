@@ -6,6 +6,8 @@ const logger = require("../lib/logger");
 const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
 
+const ROUTING_METHOD = process.env.ROUTING_METHOD || "ROUND_ROBIN";
+
 const CLUSTER_STATUS = {
   ENABLED: "ENABLED",
   DISABLED: "DISABLED",
@@ -114,7 +116,8 @@ async function scheduleQueries() {
 
           // Simple distribution of queries across all clusters
           // TODO: Could improve this based on given weights or cluster size
-          const cluster = availableClusters[currentClusterId];
+
+          const cluster = await getCluster(availableClusters, currentClusterId);
           currentClusterId = (currentClusterId + 1) % availableClusters.length;
 
           const user = query.assumed_user || query.user;
@@ -178,6 +181,46 @@ async function scheduleQueries() {
     stats.timing("scheduler.timing", new Date() - startTime);
     schedulerRunning = false;
   }
+}
+
+async function getCluster(availableClusters, currentClusterId) {
+  logger.debug("Routing Method: " + ROUTING_METHOD);
+
+  if (ROUTING_METHOD === "ROUND_ROBIN")
+    return availableClusters[currentClusterId];
+
+  if (ROUTING_METHOD === 'LOAD') {
+        logger.debug("Load based routing");
+
+        for (const cluster of availableClusters) {
+            const statsResponse = await axios({
+              url: `${cluster.url}/ui/api/stats`,
+              method: "get",
+            });
+
+            cluster.runningQueries = statsResponse.data.runningQueries;
+            cluster.queuedQueries = statsResponse.data.queuedQueries;
+            cluster.blockedQueries = statsResponse.data.blockedQueries;
+
+            logger.debug("Available cluster: " + JSON.stringify(cluster));
+        }
+
+        logger.debug("sorting clusters based on load");
+
+        const sortedClusters = availableClusters.sort(compareByLoad);
+
+        logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
+
+        let cluster = sortedClusters[0];
+
+        logger.debug("Submitting to cluster: " + JSON.stringify(cluster));
+
+        return cluster;
+  }
+}
+
+function compareByLoad(a, b) {
+    return a.runningQueries - b.runningQueries || a.queuedQueries - b.queuedQueries || a.blockedQueries - b.blockedQueries;
 }
 
 async function runSchedulerAndReschedule() {

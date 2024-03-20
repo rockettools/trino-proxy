@@ -13,11 +13,13 @@ services:
     depends_on:
       - postgres
       - trino
+      - trino2
     environment:
       - DB_URL=postgres://trino_proxy:trino_proxy@postgres/trino_proxy
       - HTTP_ENABLED=true
       - LOG_LEVEL=info
       - NODE_ENV=production
+      - ROUTING_METHOD=LOAD
 
   postgres:
     image: postgres:13
@@ -32,3 +34,9 @@ services:
     restart: always
     ports:
       - 8081:8080
+
+  trino2:
+    image: trinodb/trino
+    restart: always
+    ports:
+      - 8082:8080
