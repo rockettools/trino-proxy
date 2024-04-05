@@ -64,21 +64,27 @@ router.patch("/v1/cluster/:clusterId", async function (req, res) {
       return res.status(404).json({ error: "Not found" });
     }
 
-    const clusterUpdate = zod
+    const reqParse = zod
       .object({
         name: zod.string(),
         status: zod.nativeEnum(CLUSTER_STATUS),
         url: zod.string(),
       })
-      .strict() // don't allow extra keys
+      .partial() // Make all keys optional
+      .strip() // Strip out any extra keys
       .safeParse(req.body);
-    if (!clusterUpdate.success) {
-      return res.status(400).json({ error: clusterUpdate.error });
+    if (!reqParse.success) {
+      return res.status(400).json({ error: reqParse.error });
     }
+
+    const clusterUpdate = {
+      ...cluster,
+      ...reqParse.data,
+    };
 
     await knex("cluster")
       .where({ id: clusterId })
-      .update({ ...clusterUpdate.data, updated_at: new Date() });
+      .update({ ...clusterUpdate, updated_at: new Date() });
 
     return res.status(200).json({ id: clusterId });
   } catch (err) {
