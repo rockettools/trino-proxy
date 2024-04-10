@@ -135,6 +135,86 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       return res.status(404).json({ error: "Query not found" });
     }
 
+    if (query.status === QUERY_STATUS.NO_VALID_CLUSTERS){
+        logger.warn("No valid clusters", { state, queryId });
+
+        // Create new error return to tell Trino client the query failed
+
+        let response = {
+            data: {
+                id: uuidv4(),
+                infoUri: `${TEMP_HOST}/ui/query.html?${query.id}`,
+                stats: {
+                    state: QUERY_STATUS.FAILED,
+                    queued: false,
+                    scheduled: false,
+                    nodes: 0,
+                    totalSplits: 0,
+                    queuedSplits: 0,
+                    runningSplits: 0,
+                    completedSplits: 0,
+                    cpuTimeMillis: 0,
+                    wallTimeMillis: 0,
+                    queuedTimeMillis: 7,
+                    elapsedTimeMillis: 10,
+                    processedRows: 0,
+                    processedBytes: 0,
+                    physicalInputBytes: 0,
+                    physicalWrittenBytes: 0,
+                    peakMemoryBytes: 0,
+                    spilledBytes: 0
+                },
+                error: {
+                    message: "No valid clusters found for user cluster tag / query cluster header",
+                    errorCode: -1,
+                    errorName: QUERY_STATUS.NO_VALID_CLUSTERS,
+                    errorType: "USER_ERROR",
+                    errorLocation: {
+                        lineNumber: 1,
+                        columnNumber: 1
+                    },
+                    failureInfo: {
+                        type: "no valid clusters",
+                        message: "No valid clusters found for user cluster tag / query cluster header",
+                        stack: [],
+                        suppressed: [],
+                        errorInfo: {
+                            code: -1,
+                            name: QUERY_STATUS.NO_VALID_CLUSTERS,
+                            type: "USER_ERROR"
+                        },
+                        errorLocation: {
+                            lineNumber: 1,
+                            columnNumber: 1
+                        }
+                    }
+                },
+                warnings: []
+            }
+        }
+
+        // Update the query to specify a user options limit was reached
+        await updateQuery(query.id, {
+            status: QUERY_STATUS.NO_VALID_CLUSTERS,
+            next_uri: null,
+            stats: null,
+            error_info: response.data.error,
+            total_rows: null,
+            total_bytes:null,
+        });
+
+        const returnHeaders = getTrinoHeaders(response.headers);
+        const returnBody = getProxiedBody(
+            response.data,
+            queryId,
+            getHost(req),
+        );
+
+        logger.debug("returning response: returnHeaders: " + JSON.stringify(returnHeaders) + ", returnBody: " + JSON.stringify(returnBody));
+        return res.status(200).set(returnHeaders).json(returnBody);
+        //return res.status(500).json({ error: "No valid clusters found.  Please check your user options, cluster tags, and query headers." });
+    }
+
     // If the query is in the AWAITING_SCHEDULING state, then it hasn't been sent to a
     // Trino cluster yet. Return a fake response with a mocked keyId until the query is scheduled.
     if (query.status === QUERY_STATUS.AWAITING_SCHEDULING) {
@@ -291,6 +371,8 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
 
       const returnHeaders = getTrinoHeaders(response.headers);
       const returnBody = getProxiedBody(response.data, queryId, getHost(req));
+
+      logger.debug("returning response: returnHeaders: " + JSON.stringify(returnHeaders) + ", returnBody: " + JSON.stringify(returnBody));
 
       return res.status(200).set(returnHeaders).json(returnBody);
     } catch (err) {
