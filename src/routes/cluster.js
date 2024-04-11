@@ -16,6 +16,7 @@ router.get("/v1/cluster", async function (req, res) {
       name: cluster.name,
       url: cluster.url,
       status: cluster.status,
+      tags: cluster.tags
     }));
 
     return res.status(200).json({ clusters: items });
@@ -33,6 +34,7 @@ router.post("/v1/cluster", async function (req, res) {
         name: zod.string(),
         url: zod.string(),
         status: zod.nativeEnum(CLUSTER_STATUS),
+        tags: zod.string()
       })
       .strict() // don't allow extra keys
       .safeParse(req.body);
@@ -69,6 +71,7 @@ router.patch("/v1/cluster/:clusterId", async function (req, res) {
         name: zod.string(),
         status: zod.nativeEnum(CLUSTER_STATUS),
         url: zod.string(),
+        tags: zod.string()
       })
       .partial() // Make all keys optional
       .strip() // Strip out any extra keys

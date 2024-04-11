@@ -122,7 +122,8 @@ async function scheduleQueries() {
 
           if (!cluster) {
             logger.debug("No valid clusters found");
-            if (query.body.includes("-- Cluster: "))
+
+            if (new RegExp("-- Cluster: *(.*)").exec(query.body))
                 await knex("query")
                     .transacting(trx)
                     .where({ id: query.id })
@@ -204,9 +205,6 @@ async function getCluster(availableClusters, currentClusterId, query) {
   const queryUser = await knex("user").where({ id: query.user }).first();
   const userClusterTags = queryUser.options?.clusterTags || ["shopping"];
 
-  logger.debug("--------------------------");
-  logger.debug("User: " + queryUser.name + ", Cluster Tags: " + userClusterTags);
-
   if (ROUTING_METHOD === "ROUND_ROBIN")
     return availableClusters[currentClusterId];
 
@@ -214,9 +212,9 @@ async function getCluster(availableClusters, currentClusterId, query) {
     logger.debug("Load based routing");
 
     // look to see if the user has passed a header in the query to target a cluster
-    const queryHasClusterHeader = query.body.includes("-- Cluster: ");
+    logger.info("Regex response: " + JSON.stringify(new RegExp("-- Cluster: *(.*)").exec(query.body)));
 
-    logger.debug("queryHasClusterHeader: " + queryHasClusterHeader);
+    const queryHasClusterHeader = new RegExp("-- Cluster: *(.*)").exec(query.body) !== null;
 
     let validClusters = [];
 
@@ -225,7 +223,7 @@ async function getCluster(availableClusters, currentClusterId, query) {
             let hasClusterHeader = false;
 
             for (const tag of cluster.tags) {
-                if (query.body.includes("-- Cluster: " + tag)) {
+                if (new RegExp("-- Cluster: " + tag).exec(query.body)) {
                     hasClusterHeader = true;
                     logger.debug("cluster: " + cluster.name +", header tags: " + tag);
                     break;
@@ -240,8 +238,6 @@ async function getCluster(availableClusters, currentClusterId, query) {
                 continue;
         }
 
-        logger.debug("cluster: " + cluster.name +", tags: " + cluster.tags);
-
         const statsResponse = await axios({
           url: `${cluster.url}/ui/api/stats`,
           method: "get",
@@ -252,8 +248,6 @@ async function getCluster(availableClusters, currentClusterId, query) {
         cluster.blockedQueries = statsResponse.data.blockedQueries;
 
         validClusters.push(cluster);
-
-        logger.debug("Available cluster: " + JSON.stringify(cluster));
     }
 
     logger.debug("sorting clusters based on load");
@@ -262,7 +256,7 @@ async function getCluster(availableClusters, currentClusterId, query) {
 
     logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
 
-    let cluster = sortedClusters[0];
+    const cluster = sortedClusters[0];
 
     logger.debug("Submitting to cluster: " + JSON.stringify(cluster));
 
