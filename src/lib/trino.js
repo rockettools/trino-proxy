@@ -213,8 +213,6 @@ async function getCluster(availableClusters, currentClusterId, query) {
     logger.debug("Load based routing");
 
     // look to see if the user has passed a header in the query to target a cluster
-    logger.info("Regex response: " + JSON.stringify(new RegExp("-- Cluster: *(.*)").exec(query.body)));
-
     const queryHasClusterHeader = new RegExp("-- Cluster: *(.*)").exec(query.body) !== null;
 
     let validClusters = [];
