@@ -57,3 +57,4 @@ make format
 - STATSD_PORT: statsd agent port (default: 8125)
 - STATSD_PREFIX: prefix for statsd metrics (default: trino_proxy)
 - ROUTING_METHOD: method for choosing the cluster to submit queries to (default: ROUND_ROBIN, available options: LOAD, ROUND_ROBIN)
+- DEFAULT_CLUSTER: default cluster tag for users without any cluster tags in their options attribute (default: default)

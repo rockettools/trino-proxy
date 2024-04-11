@@ -7,6 +7,7 @@ const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
 
 const ROUTING_METHOD = process.env.ROUTING_METHOD || "ROUND_ROBIN";
+const DEFAULT_CLUSTER = process.env.DEFAULT_CLUSTER || "default";
 
 const CLUSTER_STATUS = {
   ENABLED: "ENABLED",
@@ -200,10 +201,10 @@ async function scheduleQueries() {
 async function getCluster(availableClusters, currentClusterId, query) {
   logger.debug("Routing Method: " + ROUTING_METHOD);
 
-  // get user's cluster tags and default to shopping if no tags provided
+  // get user's cluster tags and default to DEFAULT_CLUSTER if no tags provided
 
   const queryUser = await knex("user").where({ id: query.user }).first();
-  const userClusterTags = queryUser.options?.clusterTags || ["shopping"];
+  const userClusterTags = queryUser.options?.clusterTags || [DEFAULT_CLUSTER];
 
   if (ROUTING_METHOD === "ROUND_ROBIN")
     return availableClusters[currentClusterId];
