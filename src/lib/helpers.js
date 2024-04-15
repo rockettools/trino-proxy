@@ -36,62 +36,47 @@ async function getAuthorizationHeader(headers) {
 }
 
 function createErrorResponseBody(queryId, uuid, tempHost, queryStatus) {
-    return response = {
-       data: {
-           id: uuid,
-           infoUri: `${tempHost}/ui/query.html?${queryId}`,
-           stats: {
-               state: queryStatus,
-               queued: false,
-               scheduled: false,
-               nodes: 0,
-               totalSplits: 0,
-               queuedSplits: 0,
-               runningSplits: 0,
-               completedSplits: 0,
-               cpuTimeMillis: 0,
-               wallTimeMillis: 0,
-               queuedTimeMillis: 7,
-               elapsedTimeMillis: 10,
-               processedRows: 0,
-               processedBytes: 0,
-               physicalInputBytes: 0,
-               physicalWrittenBytes: 0,
-               peakMemoryBytes: 0,
-               spilledBytes: 0
-           },
-           error: {
-               message: "No valid clusters found for user cluster tag / query cluster header",
-               errorCode: -1,
-               errorName: queryStatus,
-               errorType: "USER_ERROR",
-               errorLocation: {
-                   lineNumber: 1,
-                   columnNumber: 1
-               },
-               failureInfo: {
-                   type: "no valid clusters",
-                   message: "No valid clusters found for user cluster tag / query cluster header",
-                   stack: [],
-                   suppressed: [],
-                   errorInfo: {
-                       code: -1,
-                       name: queryStatus,
-                       type: "USER_ERROR"
-                   },
-                   errorLocation: {
-                       lineNumber: 1,
-                       columnNumber: 1
-                   }
-               }
-           },
-           warnings: []
-       }
-   };
+  return {
+    data: {
+      id: uuid,
+      infoUri: `${tempHost}/ui/query.html?${queryId}`,
+      stats: {
+        state: queryStatus,
+      },
+      error: {
+        message:
+          "No valid clusters found for user cluster tag / query cluster header",
+        errorCode: -1,
+        errorName: queryStatus,
+        errorType: "USER_ERROR",
+        errorLocation: {
+          lineNumber: 1,
+          columnNumber: 1,
+        },
+        failureInfo: {
+          type: "no valid clusters",
+          message:
+            "No valid clusters found for user cluster tag / query cluster header",
+          stack: [],
+          suppressed: [],
+          errorInfo: {
+            code: -1,
+            name: queryStatus,
+            type: "USER_ERROR",
+          },
+          errorLocation: {
+            lineNumber: 1,
+            columnNumber: 1,
+          },
+        },
+      },
+      warnings: [],
+    },
+  };
 }
 
 module.exports = {
   getAuthorizationHeader,
   getProxiedBody,
-  createErrorResponseBody
+  createErrorResponseBody,
 };

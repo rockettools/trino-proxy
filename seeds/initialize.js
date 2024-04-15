@@ -22,7 +22,7 @@ exports.seed = async function (knex) {
   // Main user with headers
   await knex("user").insert({
     id: uuidv4(),
-    name: "main",
+    name: "blue",
     password: "{}", // no password
     parsers: {
       user: "-- Username: *(.*)",
@@ -30,7 +30,7 @@ exports.seed = async function (knex) {
     },
     tags: "{}",
     options: {
-      clusterTags: ["shopping"]
+      clusterTags: ["blue"],
     },
     updated_at: now,
     created_at: now,
@@ -39,7 +39,7 @@ exports.seed = async function (knex) {
   // User with email cluster targeted in options
   await knex("user").insert({
     id: uuidv4(),
-    name: "email",
+    name: "green",
     password: "{}", // no password
     parsers: {
       user: "-- Username: *(.*)",
@@ -47,28 +47,28 @@ exports.seed = async function (knex) {
     },
     tags: "{}",
     options: {
-      clusterTags: ["email"]
+      clusterTags: ["green"],
     },
     updated_at: now,
     created_at: now,
   });
 
   // User with all clusters targeted in options
-    await knex("user").insert({
-      id: uuidv4(),
-      name: "all",
-      password: "{}", // no password
-      parsers: {
-        user: "-- Username: *(.*)",
-        tags: "-- Tags: *(.*)",
-      },
-      tags: "{}",
-      options: {
-        clusterTags: ["email", "shopping"]
-      },
-      updated_at: now,
-      created_at: now,
-    });
+  await knex("user").insert({
+    id: uuidv4(),
+    name: "all",
+    password: "{}", // no password
+    parsers: {
+      user: "-- Username: *(.*)",
+      tags: "-- Tags: *(.*)",
+    },
+    tags: "{}",
+    options: {
+      clusterTags: ["blue", "green"],
+    },
+    updated_at: now,
+    created_at: now,
+  });
 
   await knex("cluster").del();
   await knex("cluster").insert({
@@ -76,26 +76,26 @@ exports.seed = async function (knex) {
     name: "trino",
     url: "http://trino:8080",
     status: CLUSTER_STATUS.ENABLED,
-    tags: ["shopping"],
+    tags: ["blue"],
     updated_at: now,
     created_at: now,
   });
   await knex("cluster").insert({
-      id: uuidv4(),
-      name: "trino2",
-      url: "http://trino2:8080",
-      status: CLUSTER_STATUS.ENABLED,
-      tags: ["shopping", "email"],
-      updated_at: now,
-      created_at: now,
-    });
+    id: uuidv4(),
+    name: "trino2",
+    url: "http://trino2:8080",
+    status: CLUSTER_STATUS.ENABLED,
+    tags: ["blue", "green"],
+    updated_at: now,
+    created_at: now,
+  });
   await knex("cluster").insert({
-        id: uuidv4(),
-        name: "trino3",
-        url: "http://trino3:8080",
-        status: CLUSTER_STATUS.ENABLED,
-        tags: ["email"],
-        updated_at: now,
-        created_at: now,
-      });
+    id: uuidv4(),
+    name: "trino3",
+    url: "http://trino3:8080",
+    status: CLUSTER_STATUS.ENABLED,
+    tags: ["green"],
+    updated_at: now,
+    created_at: now,
+  });
 };
