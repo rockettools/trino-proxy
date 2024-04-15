@@ -3,10 +3,9 @@
  * @returns { Promise<void> }
  */
 exports.up = function (knex) {
-  return knex.schema
-    .alterTable("cluster", (table) => {
-      table.specificType("tags", "varchar[]");
-    });
+  return knex.schema.alterTable("cluster", (table) => {
+    table.specificType("tags", "varchar[]");
+  });
 };
 
 /**
@@ -14,8 +13,7 @@ exports.up = function (knex) {
  * @returns { Promise<void> }
  */
 exports.down = function (knex) {
-  return knex.schema
-    .alterTable("cluster", (table) => {
-      table.dropColumn("tags");
-    });
+  return knex.schema.alterTable("cluster", (table) => {
+    table.dropColumn("tags");
+  });
 };

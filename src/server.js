@@ -30,7 +30,7 @@ app.use(authenticationMiddleware);
 app.use((req, _res, next) => {
   logger.debug(
     "Request data",
-    _.pick(req, ["url", "body", "params", "query", "rawHeaders"]),
+    _.pick(req, ["url", "body", "params", "query", "rawHeaders"])
   );
   next();
 });
@@ -80,4 +80,4 @@ if (!HTTPS_ENABLED || HTTP_ENABLED) {
   logger.info(`HTTP server listen on port ${HTTP_LISTEN_PORT}`);
 }
 
-logger.info('Routing method: ' + process.env.ROUTING_METHOD);
+logger.info("Routing method: " + process.env.ROUTING_METHOD);
