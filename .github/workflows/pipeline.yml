@@ -24,7 +24,7 @@ jobs:
       - name: Install Node Modules
         run: yarn install --frozen-lockfile
       - name: Check Lint and Format Rules
-        run: yarn format && yarn lint
+        run: yarn check:lint && yarn check:format
       - name: Docker Login
         uses: docker/login-action@v2
         with:
