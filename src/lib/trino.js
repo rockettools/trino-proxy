@@ -5,8 +5,15 @@ const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const stats = require("../lib/stats");
 const { QUERY_STATUS } = require("../lib/query");
+const { createErrorResponseBody } = require("../lib/helpers");
+const uuidv4 = require("uuid").v4;
+const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
+const cache = require("../lib/memcache");
 
 const ROUTING_METHOD = process.env.ROUTING_METHOD || "ROUND_ROBIN";
+const DEFAULT_CLUSTER_TAG = process.env.DEFAULT_CLUSTER_TAG
+  ? [process.env.DEFAULT_CLUSTER_TAG]
+  : [];
 
 const CLUSTER_STATUS = {
   ENABLED: "ENABLED",
@@ -16,6 +23,8 @@ const CLUSTER_STATUS = {
 let schedulerRunning = false;
 const SCHEDULER_DELAY_MS = 1000 * 15;
 const MAX_QUERIES_QUEUED = 10;
+
+const clusterHeaderRegex = new RegExp("-- Cluster: *(.*)");
 
 /**
  * Checks that the Trino cluster is finished initializing.
@@ -65,7 +74,7 @@ async function getAvailableClusters() {
         `healthy:${clusterHealthy}`,
       ]);
       return clusterHealthy;
-    },
+    }
   );
 
   stats.gauge("available_clusters", availableClusters.length);
@@ -117,59 +126,85 @@ async function scheduleQueries() {
           // Simple distribution of queries across all clusters
           // TODO: Could improve this based on given weights or cluster size
 
-          const cluster = await getCluster(availableClusters, currentClusterId);
+          const cluster = await getCluster(
+            availableClusters,
+            currentClusterId,
+            query
+          );
           currentClusterId = (currentClusterId + 1) % availableClusters.length;
 
-          const user = query.assumed_user || query.user;
-          const source = query.source || "trino-proxy";
-          const trinoHeaders = query.trino_request_headers || {};
+          if (!cluster) {
+            logger.debug("No valid clusters found");
 
-          // Pass through any user tags to Trino for resource group management
-          const clientTags = new Set(query.tags);
-          // Add custom tag so that queries can always be traced back to trino-proxy
-          clientTags.add("trino-proxy");
+            if (clusterHeaderRegex.exec(query.body)) {
+              // Create new error return to tell Trino client the query failed
+              const response = await createErrorResponseBody(
+                query.id,
+                uuidv4(),
+                TEMP_HOST,
+                QUERY_STATUS.NO_VALID_CLUSTERS
+              );
 
-          // Issue the statement request to the Trino cluster. This does not actually
-          // kick off execution of the query, the first nextUri call does.
-          const response = await axios({
-            url: `${cluster.url}/v1/statement`,
-            method: "post",
-            headers: {
-              // passthrough headers from client state
-              ...trinoHeaders,
-              // Overwrite the user, source, and tag headers with updated values
-              "X-Trino-User": user,
-              "X-Trino-Source": source,
-              "X-Trino-Client-Tags": Array.from(clientTags).join(","),
-            },
-            data: query.body,
-          });
+              await knex("query")
+                .transacting(trx)
+                .where({ id: query.id })
+                .update({
+                  status: QUERY_STATUS.NO_VALID_CLUSTERS,
+                  error_info: response.data.error,
+                });
+            }
+          } else {
+            const user = query.assumed_user || query.user;
+            const source = query.source || "trino-proxy";
+            const trinoHeaders = query.trino_request_headers || {};
 
-          await knex("query")
-            .transacting(trx)
-            .where({ id: query.id })
-            .update({
-              cluster_query_id: response.data?.id,
-              cluster_id: cluster.id,
-              status: response.data?.stats?.state || QUERY_STATUS.QUEUED,
-              next_uri: response.data?.nextUri || null,
-              stats: response.data.stats,
+            // Pass through any user tags to Trino for resource group management
+            const clientTags = new Set(query.tags);
+            // Add custom tag so that queries can always be traced back to trino-proxy
+            clientTags.add("trino-proxy");
+
+            // Issue the statement request to the Trino cluster. This does not actually
+            // kick off execution of the query, the first nextUri call does.
+            const response = await axios({
+              url: `${cluster.url}/v1/statement`,
+              method: "post",
+              headers: {
+                // passthrough headers from client state
+                ...trinoHeaders,
+                // Overwrite the user, source, and tag headers with updated values
+                "X-Trino-User": user,
+                "X-Trino-Source": source,
+                "X-Trino-Client-Tags": Array.from(clientTags).join(","),
+              },
+              data: query.body,
             });
 
-          logger.debug("Submitted query to Trino cluster", {
-            queryId: query.id,
-            cluster: cluster.name,
-            user,
-            source,
-            data: response.data,
-          });
+            await knex("query")
+              .transacting(trx)
+              .where({ id: query.id })
+              .update({
+                cluster_query_id: response.data?.id,
+                cluster_id: cluster.id,
+                status: response.data?.stats?.state || QUERY_STATUS.QUEUED,
+                next_uri: response.data?.nextUri || null,
+                stats: response.data.stats,
+              });
 
-          stats.increment("query_queued", [
-            `cluster:${cluster.name}`,
-            `user:${user}`,
-            `source:${source}`,
-            ...clientTags,
-          ]);
+            logger.debug("Submitted query to Trino cluster", {
+              queryId: query.id,
+              cluster: cluster.name,
+              user,
+              source,
+              data: response.data,
+            });
+
+            stats.increment("query_queued", [
+              `cluster:${cluster.name}`,
+              `user:${user}`,
+              `source:${source}`,
+              ...clientTags,
+            ]);
+          }
         });
       } catch (scheduleErr) {
         logger.error("Error scheduling query", scheduleErr);
@@ -183,44 +218,75 @@ async function scheduleQueries() {
   }
 }
 
-async function getCluster(availableClusters, currentClusterId) {
+async function getCluster(availableClusters, currentClusterId, query) {
   logger.debug("Routing Method: " + ROUTING_METHOD);
+
+  // get user's cluster tags and default to DEFAULT_CLUSTER_TAG if no tags provided
+
+  let queryUser = cache.get(query.user);
+
+  if (!queryUser) {
+    queryUser = await knex("user").where({ id: query.user }).first();
+    cache.set(query.user, queryUser);
+  }
+
+  const userClusterTags = queryUser.options?.clusterTags || DEFAULT_CLUSTER_TAG;
 
   if (ROUTING_METHOD === "ROUND_ROBIN")
     return availableClusters[currentClusterId];
 
-  if (ROUTING_METHOD === 'LOAD') {
-        logger.debug("Load based routing");
+  if (ROUTING_METHOD === "LOAD") {
+    logger.debug("Load based routing");
 
-        for (const cluster of availableClusters) {
-            const statsResponse = await axios({
-              url: `${cluster.url}/ui/api/stats`,
-              method: "get",
-            });
+    // look to see if the user has passed a header in the query to target a cluster
+    const queryHasClusterHeader = clusterHeaderRegex.exec(query.body) !== null;
 
-            cluster.runningQueries = statsResponse.data.runningQueries;
-            cluster.queuedQueries = statsResponse.data.queuedQueries;
-            cluster.blockedQueries = statsResponse.data.blockedQueries;
+    let validClusters = [];
 
-            logger.debug("Available cluster: " + JSON.stringify(cluster));
-        }
+    for (const cluster of availableClusters) {
+      if (queryHasClusterHeader) {
+        const queryClusterTags = clusterHeaderRegex.exec(query.body);
 
-        logger.debug("sorting clusters based on load");
+        if (
+          queryClusterTags.filter((x) => cluster.tags.includes(x)).length == 0
+        )
+          continue;
+      } else {
+        // skip cluster if the user's tags and cluster's tags do not intersect
+        if (userClusterTags.filter((x) => cluster.tags.includes(x)).length == 0)
+          continue;
+      }
 
-        const sortedClusters = availableClusters.sort(compareByLoad);
+      const statsResponse = await axios({
+        url: `${cluster.url}/ui/api/stats`,
+        method: "get",
+      });
 
-        logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
+      cluster.runningQueries = statsResponse.data.runningQueries;
+      cluster.queuedQueries = statsResponse.data.queuedQueries;
+      cluster.blockedQueries = statsResponse.data.blockedQueries;
 
-        let cluster = sortedClusters[0];
+      validClusters.push(cluster);
+    }
 
-        logger.debug("Submitting to cluster: " + JSON.stringify(cluster));
+    logger.debug("sorting clusters based on load");
 
-        return cluster;
+    const sortedClusters = validClusters.sort(compareByLoad);
+
+    logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
+
+    const cluster = sortedClusters[0];
+
+    return cluster;
   }
 }
 
 function compareByLoad(a, b) {
-    return a.runningQueries - b.runningQueries || a.queuedQueries - b.queuedQueries || a.blockedQueries - b.blockedQueries;
+  return (
+    a.runningQueries - b.runningQueries ||
+    a.queuedQueries - b.queuedQueries ||
+    a.blockedQueries - b.blockedQueries
+  );
 }
 
 async function runSchedulerAndReschedule() {

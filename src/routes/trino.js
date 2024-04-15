@@ -3,7 +3,11 @@ const express = require("express");
 const uuidv4 = require("uuid").v4;
 const axios = require("axios").default;
 
-const { getAuthorizationHeader, getProxiedBody } = require("../lib/helpers");
+const {
+  getAuthorizationHeader,
+  getProxiedBody,
+  createErrorResponseBody,
+} = require("../lib/helpers");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
 const cache = require("../lib/memcache");
@@ -109,7 +113,7 @@ router.post("/v1/statement", async (req, res) => {
         },
       },
       newQueryId,
-      getHost(req),
+      getHost(req)
     );
     return res.status(200).json(returnBody);
   } catch (err) {
@@ -135,6 +139,21 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       return res.status(404).json({ error: "Query not found" });
     }
 
+    if (query.status === QUERY_STATUS.NO_VALID_CLUSTERS) {
+      logger.warn("No valid clusters", { state, queryId });
+      const response = await createErrorResponseBody(
+        query.id,
+        uuidv4(),
+        TEMP_HOST,
+        QUERY_STATUS.NO_VALID_CLUSTERS
+      );
+
+      const returnHeaders = getTrinoHeaders(response.headers);
+      const returnBody = getProxiedBody(response.data, queryId, getHost(req));
+
+      return res.status(200).set(returnHeaders).json(returnBody);
+    }
+
     // If the query is in the AWAITING_SCHEDULING state, then it hasn't been sent to a
     // Trino cluster yet. Return a fake response with a mocked keyId until the query is scheduled.
     if (query.status === QUERY_STATUS.AWAITING_SCHEDULING) {
@@ -148,7 +167,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
           },
         },
         query.id,
-        getHost(req),
+        getHost(req)
       );
       return res.status(200).json(returnBody);
     }
@@ -166,7 +185,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
           },
         },
         query.id,
-        getHost(req),
+        getHost(req)
       );
       return res.status(200).json(returnBody);
     }
@@ -267,7 +286,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
           const returnBody = getProxiedBody(
             response.data,
             queryId,
-            getHost(req),
+            getHost(req)
           );
 
           return res.status(200).set(returnHeaders).json(returnBody);
