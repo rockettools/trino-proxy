@@ -230,9 +230,7 @@ async function getCluster(availableClusters, currentClusterId, query) {
     cache.set(query.user, queryUser);
   }
 
-  const userClusterTags = queryUser.options?.clusterTags || [
-    DEFAULT_CLUSTER_TAG,
-  ];
+  const userClusterTags = queryUser.options?.clusterTags || DEFAULT_CLUSTER_TAG;
 
   if (ROUTING_METHOD === "ROUND_ROBIN")
     return availableClusters[currentClusterId];
