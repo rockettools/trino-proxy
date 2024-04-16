@@ -2,7 +2,7 @@ const winston = require("winston");
 
 const logLevel = process.env.LOG_LEVEL || "info";
 const logFormat = winston.format.printf(
-  (info) => `${info.timestamp} ${info.level} [${info.label}]: ${info.message}`,
+  (info) => `${info.timestamp} ${info.level} [${info.label}]: ${info.message}`
 );
 
 const logger = winston.createLogger({
@@ -10,7 +10,7 @@ const logger = winston.createLogger({
   format: winston.format.combine(
     winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     winston.format.errors({ stack: true }),
-    logFormat,
+    logFormat
   ),
   defaultMeta: { service: "trino-proxy" },
 });
@@ -18,7 +18,7 @@ const logger = winston.createLogger({
 logger.add(
   new winston.transports.Console({
     format: winston.format.simple(),
-  }),
+  })
 );
 
 module.exports = logger;

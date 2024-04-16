@@ -8,6 +8,8 @@
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --fix .",
+    "check:format": "prettier --check .",
+    "check:lint": "eslint .",
     "prepare": "husky install"
   },
   "engines": {
@@ -36,7 +38,7 @@
     "prettier": "^3.0.3"
   },
   "lint-staged": {
-    "src/**/*.js": [
+    "**/*.js": [
       "eslint",
       "prettier --write"
     ]

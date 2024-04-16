@@ -19,7 +19,7 @@ const QUERY_STATUS = {
   PLANNING: "PLANNING",
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
-  STARTING: "STARTING"
+  STARTING: "STARTING",
 };
 
 async function getQueryById(newQueryId) {
