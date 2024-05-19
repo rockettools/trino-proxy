@@ -1,11 +1,18 @@
 {
-  "extends": ["eslint:recommended", "eslint-config-prettier"],
-  "plugins": ["eslint-plugin-prettier"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "eslint-config-prettier"
+  ],
+  "plugins": ["@typescript-eslint", "eslint-plugin-prettier"],
+  "parser": "@typescript-eslint/parser",
+  "ignorePatterns": ["**/dist"],
   "env": {
     "node": true,
     "es2022": true
   },
   "rules": {
-    "prettier/prettier": "error"
+    "prettier/prettier": "error",
+    "@typescript-eslint/no-var-requires": "warn"
   }
 }
