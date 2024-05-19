@@ -49,7 +49,9 @@ async function isClusterHealthy(clusterBaseUrl) {
     const isHealthy = infoResponse.data && infoResponse.data.starting === false;
     return isHealthy;
   } catch (err) {
-    logger.error("Error checking cluster health", err, {
+    const errorDetails = err.toJSON?.() || {};
+    logger.error("Error checking cluster health", {
+      ...errorDetails,
       clusterBaseUrl,
     });
     return false;
