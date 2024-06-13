@@ -23,6 +23,6 @@ migrate:
 
 # Cleanup all docker containers
 clean:
-	docker-compose down
+	docker-compose down --rmi local --volumes --remove-orphans
 
 reset: clean migrate start
