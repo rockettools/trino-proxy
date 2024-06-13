@@ -41,6 +41,8 @@ make format
 
 ## Configuration
 
+- ENABLE_API: enables the Trino client API for accepting and checking queries (default: false)
+- ENABLE_SCHEDULER: enables the scheduler for sending queries to downstream clusters (default: false)
 - DB_URL: postgres database connection string
 - HTTP_ENABLED: whether HTTP server is enabled (set to true)
 - HTTP_LISTEN_PORT: HTTP port (default: 8080)

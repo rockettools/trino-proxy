@@ -2,9 +2,9 @@ volumes:
   postgres-data:
 
 services:
-  proxy:
+  api:
     build: .
-    container_name: proxy
+    container_name: api
     restart: always
     volumes:
       - ./migrations:/app/migrations
@@ -22,7 +22,28 @@ services:
       - HTTP_ENABLED=true
       - LOG_LEVEL=debug
       - NODE_ENV=production
-      - ROUTING_METHOD=LOAD
+      - ENABLE_API=true
+
+  scheduler:
+    build: .
+    container_name: scheduler
+    restart: always
+    volumes:
+      - ./src:/app/src
+    ports:
+      - 8081:8080
+    depends_on:
+      - postgres
+      - trino1
+      - trino2
+      - trino3
+    environment:
+      - DB_URL=postgres://trino_proxy:trino_proxy@postgres/trino_proxy
+      - HTTP_ENABLED=true
+      - LOG_LEVEL=debug
+      - NODE_ENV=production
+      - ROUTING_METHOD=ROUND_ROBIN
+      - ENABLE_SCHEDULER=true
 
   postgres:
     image: postgres:13

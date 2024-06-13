@@ -13,13 +13,13 @@ format:
 
 # Start docker containers
 start:
-	docker-compose up --build --attach proxy
+	docker-compose up --build --attach api --attach scheduler
 
 # Run database migrations against db
 migrate:
 	docker-compose up -d postgres
-	docker-compose run --build proxy /app/node_modules/.bin/knex migrate:latest
-	docker-compose run --build proxy /app/node_modules/.bin/knex seed:run
+	docker-compose run --build api /app/node_modules/.bin/knex migrate:latest
+	docker-compose run --build api /app/node_modules/.bin/knex seed:run
 
 # Cleanup all docker containers
 clean:

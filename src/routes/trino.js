@@ -19,8 +19,6 @@ const {
   updateQuery,
 } = require("../lib/query");
 
-const { scheduleQueries } = require("../lib/trino");
-
 const router = express.Router();
 const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
 const MOCKED_QUERY_KEY_ID = "AWAITING_SCHEDULING";
@@ -38,6 +36,16 @@ function getHost(req) {
 function getTrinoHeaders(headers = {}) {
   return _.pickBy(headers, (_value, key) => key.startsWith("x-trino"));
 }
+
+// Mock info endpoint to abstract out the cluster information
+router.get("/v1/info", async (req, res) => {
+  return res.status(200).json({
+    nodeVersion: { version: "trino-proxy" },
+    environment: "docker",
+    coordinator: true,
+    starting: false,
+  });
+});
 
 router.post("/v1/statement", async (req, res) => {
   if (!req.user) {
@@ -101,9 +109,6 @@ router.post("/v1/statement", async (req, res) => {
       created_at: times,
       updated_at: times,
     });
-
-    // Asynchronously schedule queries if not running already
-    scheduleQueries();
 
     // Return a mock response with mocked query keyId and num until the query is scheduled and
     // a real URL is created for the client to call next. This service will continously return
