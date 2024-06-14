@@ -44,6 +44,11 @@ router.post("/v1/statement", async (req, res) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  // Block submission of empty queries since Trino won't accept them
+  if (!req.body) {
+    return res.status(400).json({ error: "Query is required" });
+  }
+
   // Default user to whoever submitted the query
   let assumedUser = req.user.username;
   // Initialize empty client tags using a set to prevent duplicates
