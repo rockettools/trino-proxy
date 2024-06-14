@@ -4,6 +4,11 @@ import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
 
 import {
+  TRINO_TEMP_HOST,
+  TRINO_MOCKED_QUERY_KEY_ID,
+  TRINO_MOCKED_QUERY_NUM,
+} from "../lib/constants";
+import {
   getAuthorizationHeader,
   getProxiedBody,
   createErrorResponseBody,
@@ -22,9 +27,6 @@ import {
 import type { Request } from "express";
 
 const router = express.Router();
-const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
-const MOCKED_QUERY_KEY_ID = "AWAITING_SCHEDULING";
-const MOCKED_QUERY_NUM = "0";
 
 function getHost(req: Request) {
   const host = req.get("host");
@@ -125,8 +127,8 @@ router.post("/v1/statement", async (req, res) => {
     const returnBody = getProxiedBody(
       {
         id: newQueryId,
-        infoUri: `${TEMP_HOST}/ui/query.html?${newQueryId}`,
-        nextUri: `${TEMP_HOST}/v1/statement/queued/${newQueryId}/${MOCKED_QUERY_KEY_ID}/${MOCKED_QUERY_NUM}`,
+        infoUri: `${TRINO_TEMP_HOST}/ui/query.html?${newQueryId}`,
+        nextUri: `${TRINO_TEMP_HOST}/v1/statement/queued/${newQueryId}/${TRINO_MOCKED_QUERY_KEY_ID}/${TRINO_MOCKED_QUERY_NUM}`,
         stats: {
           state: QUERY_STATUS.QUEUED,
         },
@@ -163,7 +165,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       const response = createErrorResponseBody(
         query.id,
         uuidv4(),
-        TEMP_HOST,
+        TRINO_TEMP_HOST,
         QUERY_STATUS.NO_VALID_CLUSTERS
       );
 
@@ -177,8 +179,8 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       const returnBody = getProxiedBody(
         {
           id: query.id,
-          infoUri: `${TEMP_HOST}/ui/query.html?${query.id}`,
-          nextUri: `${TEMP_HOST}/v1/statement/queued/${query.id}/${MOCKED_QUERY_KEY_ID}/${MOCKED_QUERY_NUM}`,
+          infoUri: `${TRINO_TEMP_HOST}/ui/query.html?${query.id}`,
+          nextUri: `${TRINO_TEMP_HOST}/v1/statement/queued/${query.id}/${TRINO_MOCKED_QUERY_KEY_ID}/${TRINO_MOCKED_QUERY_NUM}`,
           stats: {
             state: QUERY_STATUS.QUEUED,
           },
@@ -191,11 +193,11 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
 
     // If we received the mocked keyId/num pair back and we're no longer in AWAITING_SCHEDULING,
     // we can use the NEXT_URI from the Trino cluster to create a valid URL
-    if (keyId === MOCKED_QUERY_KEY_ID && num === MOCKED_QUERY_NUM) {
+    if (keyId === TRINO_MOCKED_QUERY_KEY_ID && num === TRINO_MOCKED_QUERY_NUM) {
       const returnBody = getProxiedBody(
         {
           id: query.cluster_query_id,
-          infoUri: `${TEMP_HOST}/ui/query.html?${query.id}`,
+          infoUri: `${TRINO_TEMP_HOST}/ui/query.html?${query.id}`,
           nextUri: query.next_uri,
           stats: {
             state: query.status,

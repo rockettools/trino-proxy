@@ -2,6 +2,11 @@ import axios from "axios";
 import bluebird from "bluebird";
 import { v4 as uuidv4 } from "uuid";
 
+import {
+  CLUSTER_STATUS,
+  ROUTING_METHODS,
+  TRINO_TEMP_HOST,
+} from "../lib/constants";
 import { knex } from "../lib/knex";
 import logger from "../lib/logger";
 import stats from "../lib/stats";
@@ -12,17 +17,11 @@ import { userCache } from "../lib/memcache";
 import type { Cluster, Query } from "../types/models";
 import type { ClusterStats } from "../types/trino";
 
-const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
-
-const ROUTING_METHOD = process.env.ROUTING_METHOD || "ROUND_ROBIN";
+const ROUTING_METHOD =
+  process.env.ROUTING_METHOD || ROUTING_METHODS.ROUND_ROBIN;
 const DEFAULT_CLUSTER_TAG = process.env.DEFAULT_CLUSTER_TAG
   ? [process.env.DEFAULT_CLUSTER_TAG]
   : [];
-
-export const CLUSTER_STATUS = {
-  ENABLED: "ENABLED",
-  DISABLED: "DISABLED",
-};
 
 let schedulerRunning = false;
 const SCHEDULER_DELAY_MS = process.env.SCHEDULER_DELAY_MS
@@ -129,9 +128,6 @@ async function scheduleQueries() {
           // If no query could be found, early exit
           if (!query) return;
 
-          // Simple distribution of queries across all clusters
-          // TODO: Could improve this based on given weights or cluster size
-
           const cluster = await getCluster(
             availableClusters,
             currentClusterId,
@@ -141,13 +137,12 @@ async function scheduleQueries() {
 
           if (!cluster) {
             logger.debug("No valid clusters found");
-
             if (clusterHeaderRegex.exec(query.body)) {
               // Create new error return to tell Trino client the query failed
-              const response = await createErrorResponseBody(
+              const response = createErrorResponseBody(
                 query.id,
                 uuidv4(),
-                TEMP_HOST,
+                TRINO_TEMP_HOST,
                 QUERY_STATUS.NO_VALID_CLUSTERS
               );
 
@@ -212,7 +207,9 @@ async function scheduleQueries() {
           }
         });
       } catch (scheduleErr) {
-        logger.error("Error scheduling query", scheduleErr);
+        // @ts-expect-error any type
+        const errorDetails = scheduleErr?.toJSON?.() || scheduleErr;
+        logger.error("Error scheduling query", errorDetails);
       }
     }
   } catch (err) {
@@ -238,13 +235,11 @@ async function getCluster(
   const userClusterTags =
     queryUser?.options?.clusterTags || DEFAULT_CLUSTER_TAG;
 
-  if (ROUTING_METHOD === "ROUND_ROBIN") {
+  if (ROUTING_METHOD === ROUTING_METHODS.ROUND_ROBIN) {
     return availableClusters[currentClusterId];
   }
 
-  if (ROUTING_METHOD === "LOAD") {
-    logger.debug("Load based routing");
-
+  if (ROUTING_METHOD === ROUTING_METHODS.LOAD) {
     // look to see if the user has passed a header in the query to target a cluster
     const queryClusterTags = clusterHeaderRegex.exec(query.body);
 
@@ -298,8 +293,14 @@ async function runSchedulerAndReschedule() {
 }
 
 export async function startScheduler() {
-  logger.info(
-    `Scheduling query scheduler to run every ${SCHEDULER_DELAY_MS}ms`
-  );
+  logger.info("Starting scheduler", {
+    periodMs: SCHEDULER_DELAY_MS,
+    routingMethod: ROUTING_METHOD,
+  });
+
+  if (!Object.values(ROUTING_METHODS).includes(ROUTING_METHOD)) {
+    throw new Error(`Invalid routing method: ${ROUTING_METHOD}`);
+  }
+
   setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 }
