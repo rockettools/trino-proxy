@@ -8,7 +8,7 @@ const { QUERY_STATUS } = require("../lib/query");
 const { createErrorResponseBody } = require("../lib/helpers");
 const uuidv4 = require("uuid").v4;
 const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
-const cache = require("../lib/memcache");
+const { userCache } = require("../lib/memcache");
 
 const ROUTING_METHOD = process.env.ROUTING_METHOD || "ROUND_ROBIN";
 const DEFAULT_CLUSTER_TAG = process.env.DEFAULT_CLUSTER_TAG
@@ -219,15 +219,11 @@ async function scheduleQueries() {
 }
 
 async function getCluster(availableClusters, currentClusterId, query) {
-  logger.debug("Routing Method: " + ROUTING_METHOD);
-
-  // get user's cluster tags and default to DEFAULT_CLUSTER_TAG if no tags provided
-
-  let queryUser = cache.get(query.user);
-
+  // Get user's cluster tags and default to DEFAULT_CLUSTER_TAG if no tags provided
+  let queryUser = userCache.get(query.user);
   if (!queryUser) {
     queryUser = await knex("user").where({ id: query.user }).first();
-    cache.set(query.user, queryUser);
+    userCache.set(query.user, queryUser);
   }
 
   const userClusterTags = queryUser.options?.clusterTags || DEFAULT_CLUSTER_TAG;

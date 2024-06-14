@@ -10,7 +10,7 @@ const {
 } = require("../lib/helpers");
 const { knex } = require("../lib/knex");
 const logger = require("../lib/logger");
-const cache = require("../lib/memcache");
+const { traceCache } = require("../lib/memcache");
 const {
   getQueryById,
   getQueryHeaderInfo,
@@ -71,7 +71,7 @@ router.post("/v1/statement", async (req, res) => {
       if (!info) {
         info = parseFirstQueryHeader(req.body, req.user.parsers);
         logger.debug("Parsed header info from query", info);
-        cache.set(trinoTraceToken, info);
+        traceCache.set(trinoTraceToken, info);
       }
 
       assumedUser = info.user;
