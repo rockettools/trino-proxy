@@ -73,8 +73,8 @@ exports.seed = async function (knex) {
   await knex("cluster").del();
   await knex("cluster").insert({
     id: uuidv4(),
-    name: "trino",
-    url: "http://trino:8080",
+    name: "trino1",
+    url: "http://trino1:8080",
     status: CLUSTER_STATUS.ENABLED,
     tags: ["blue"],
     updated_at: now,
@@ -85,7 +85,7 @@ exports.seed = async function (knex) {
     name: "trino2",
     url: "http://trino2:8080",
     status: CLUSTER_STATUS.ENABLED,
-    tags: ["blue", "green"],
+    tags: ["green"],
     updated_at: now,
     created_at: now,
   });
@@ -94,7 +94,7 @@ exports.seed = async function (knex) {
     name: "trino3",
     url: "http://trino3:8080",
     status: CLUSTER_STATUS.ENABLED,
-    tags: ["green"],
+    tags: [],
     updated_at: now,
     created_at: now,
   });

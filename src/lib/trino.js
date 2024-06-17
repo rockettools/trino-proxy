@@ -21,7 +21,7 @@ const CLUSTER_STATUS = {
 };
 
 let schedulerRunning = false;
-const SCHEDULER_DELAY_MS = 1000 * 15;
+const SCHEDULER_DELAY_MS = parseInt(process.env.SCHEDULER_DELAY_MS) || 1000 * 5;
 const MAX_QUERIES_QUEUED = 10;
 
 const clusterHeaderRegex = new RegExp("-- Cluster: *(.*)");
@@ -294,10 +294,14 @@ async function runSchedulerAndReschedule() {
   setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 }
 
-logger.info(`Scheduling query scheduler to run every ${SCHEDULER_DELAY_MS}ms`);
-setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
+async function startScheduler() {
+  logger.info(
+    `Scheduling query scheduler to run every ${SCHEDULER_DELAY_MS}ms`
+  );
+  setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
+}
 
 module.exports = {
-  scheduleQueries,
+  startScheduler,
   CLUSTER_STATUS,
 };

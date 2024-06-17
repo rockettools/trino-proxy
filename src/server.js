@@ -6,13 +6,23 @@ const https = require("https");
 const logger = require("./lib/logger");
 const stats = require("./lib/stats");
 const authenticationMiddleware = require("./middlewares/authentication");
+const { startScheduler } = require("./lib/trino");
 
+const ENABLE_API = process.env.ENABLE_API === "true";
+const ENABLE_SCHEDULER = process.env.ENABLE_SCHEDULER === "true";
 const REQUEST_BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || "500kb";
 const HTTP_ENABLED = process.env.HTTP_ENABLED === "true";
 const HTTP_LISTEN_PORT = parseInt(process.env.HTTP_LISTEN_PORT) || 8080;
 const HTTPS_ENABLED = process.env.HTTPS_ENABLED === "true";
 const HTTPS_LISTEN_PORT = parseInt(process.env.HTTPS_LISTEN_PORT) || 8443;
 
+// Validate that at least one of the services is enabled. One or both can be set.
+if (!ENABLE_API && !ENABLE_SCHEDULER) {
+  throw new Error("Please enable API and/or Scheduler services");
+}
+
+// Basic server, which is setup for both the API and Scheduler
+// In both microservices, health checks are required
 const app = express();
 
 // Set content-type for incoming statement requests before parsing middleware is applied
@@ -35,27 +45,19 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Add routes
-app.use("/", require("./routes/cluster"));
-app.use("/", require("./routes/query"));
-app.use("/", require("./routes/trino"));
-app.use("/", require("./routes/user"));
-
 // Health check
 app.get("/health", (_req, res) => {
   stats.increment("healthcheck");
   return res.status(200).json({ status: "ok" });
 });
 
-// Mock info endpoint to abstract out the cluster information
-app.get("/v1/info", async (req, res) => {
-  return res.status(200).json({
-    nodeVersion: { version: "trino-proxy" },
-    environment: "docker",
-    coordinator: true,
-    starting: false,
-  });
-});
+// Enable Trino Proxy and Trino client APIs
+if (ENABLE_API) {
+  app.use("/", require("./routes/cluster"));
+  app.use("/", require("./routes/query"));
+  app.use("/", require("./routes/trino"));
+  app.use("/", require("./routes/user"));
+}
 
 // Fallback handler
 app.use("*", (req, res) => {
@@ -80,4 +82,7 @@ if (!HTTPS_ENABLED || HTTP_ENABLED) {
   logger.info(`HTTP server listen on port ${HTTP_LISTEN_PORT}`);
 }
 
-logger.info("Routing method: " + process.env.ROUTING_METHOD);
+// In scheduler is enabled, start the schedule loop
+if (ENABLE_SCHEDULER) {
+  startScheduler();
+}
