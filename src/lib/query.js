@@ -1,5 +1,5 @@
 const { knex } = require("./knex");
-const cache = require("./memcache");
+const { traceCache } = require("./memcache");
 const logger = require("./logger");
 const stats = require("./stats");
 
@@ -38,7 +38,7 @@ async function getQueryHeaderInfo(traceId) {
     return null;
   }
 
-  const cachedHeaderData = cache.get(traceId);
+  const cachedHeaderData = traceCache.get(traceId);
   if (cachedHeaderData) {
     return cachedHeaderData;
   }
