@@ -59,9 +59,15 @@ router.post("/v1/user", async function (req, res) {
       }
 
       // First user has to have a password for security purposes
-      if (!password) {
+      // First user also has to be an admin, otherwise no other users can be created
+      if (!password || !tags.includes("admin")) {
         return res.status(400).json({ error: "Invalid input" });
       }
+    }
+
+    // If it's not the first user, the user must be an admin
+    if (req.user && !req.user.tags.includes("admin")) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const userId = uuidv4();
@@ -83,7 +89,9 @@ router.post("/v1/user", async function (req, res) {
 });
 
 router.patch("/v1/user/:userId", async function (req, res) {
-  if (!req.user) {
+  // Only admin users can adjust tags
+  // Otherwise, all users can make themselves an admin
+  if (!req.user || !req.user.tags.includes("admin")) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
