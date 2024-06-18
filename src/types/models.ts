@@ -28,6 +28,7 @@ export type Query = {
   cluster_id: string | null;
   cluster_query_id: string | null;
   trace_id: string | null;
+  source: string | null;
   user: string;
   assumed_user: string;
   next_uri: string | null;
