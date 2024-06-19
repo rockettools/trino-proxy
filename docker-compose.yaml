@@ -42,7 +42,7 @@ services:
       - HTTP_ENABLED=true
       - LOG_LEVEL=debug
       - NODE_ENV=production
-      - ROUTING_METHOD=ROUND_ROBIN
+      - ROUTING_METHOD=LOAD
       - ENABLE_SCHEDULER=true
 
   postgres:
@@ -60,6 +60,10 @@ services:
     image: trinodb/trino
     container_name: trino1
     restart: always
+    volumes:
+      - ./seeds/trino_config:/etc/trino
+    depends_on:
+      - postgres
     ports:
       - 8091:8080
 
@@ -67,6 +71,10 @@ services:
     image: trinodb/trino
     container_name: trino2
     restart: always
+    volumes:
+      - ./seeds/trino_config:/etc/trino
+    depends_on:
+      - postgres
     ports:
       - 8092:8080
 
@@ -74,5 +82,9 @@ services:
     image: trinodb/trino
     container_name: trino3
     restart: always
+    volumes:
+      - ./seeds/trino_config:/etc/trino
+    depends_on:
+      - postgres
     ports:
       - 8093:8080
