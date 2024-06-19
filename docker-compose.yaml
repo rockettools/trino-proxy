@@ -62,6 +62,8 @@ services:
     restart: always
     volumes:
       - ./seeds/trino_config:/etc/trino
+    depends_on:
+      - postgres
     ports:
       - 8091:8080
 
@@ -71,6 +73,8 @@ services:
     restart: always
     volumes:
       - ./seeds/trino_config:/etc/trino
+    depends_on:
+      - postgres
     ports:
       - 8092:8080
 
@@ -80,5 +84,7 @@ services:
     restart: always
     volumes:
       - ./seeds/trino_config:/etc/trino
+    depends_on:
+      - postgres
     ports:
       - 8093:8080
