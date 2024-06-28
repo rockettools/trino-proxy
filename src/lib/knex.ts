@@ -1,3 +1,5 @@
+import Knex from "knex";
+
 const { DB_URL, KNEX_POOL_MIN, KNEX_POOL_MAX, KNEX_CONNECTION_TIMEOUT } =
   process.env;
 
@@ -11,7 +13,7 @@ const connectionTimeout = KNEX_CONNECTION_TIMEOUT
   ? parseInt(KNEX_CONNECTION_TIMEOUT)
   : 10000;
 
-exports.knex = require("knex")({
+export const knex = Knex({
   client: "pg",
   connection: DB_URL,
   /** It is recommended to set min to 0 so idle connections can be terminated */

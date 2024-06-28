@@ -1,9 +1,4 @@
-type User = {
-  id: string;
-  username: string;
-  parsers: object;
-  tags: string[];
-};
+import type { User } from "../models";
 
 declare global {
   namespace Express {

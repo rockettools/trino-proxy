@@ -1,20 +1,29 @@
-const _ = require("lodash");
-const express = require("express");
-const http = require("http");
-const https = require("https");
+import _ from "lodash";
+import express from "express";
+import http from "http";
+import https from "https";
 
-const logger = require("./lib/logger");
-const stats = require("./lib/stats");
-const authenticationMiddleware = require("./middlewares/authentication");
-const { startScheduler } = require("./lib/trino");
+import logger from "./lib/logger";
+import stats from "./lib/stats";
+import authenticationMiddleware from "./middlewares/authentication";
+import { startScheduler } from "./lib/trino";
+
+import clusterRouter from "./routes/cluster";
+import queryRouter from "./routes/query";
+import trinoRouter from "./routes/trino";
+import userRouter from "./routes/user";
 
 const ENABLE_API = process.env.ENABLE_API === "true";
 const ENABLE_SCHEDULER = process.env.ENABLE_SCHEDULER === "true";
 const REQUEST_BODY_LIMIT = process.env.REQUEST_BODY_LIMIT || "500kb";
 const HTTP_ENABLED = process.env.HTTP_ENABLED === "true";
-const HTTP_LISTEN_PORT = parseInt(process.env.HTTP_LISTEN_PORT) || 8080;
+const HTTP_LISTEN_PORT = process.env.HTTP_LISTEN_PORT
+  ? parseInt(process.env.HTTP_LISTEN_PORT)
+  : 8080;
 const HTTPS_ENABLED = process.env.HTTPS_ENABLED === "true";
-const HTTPS_LISTEN_PORT = parseInt(process.env.HTTPS_LISTEN_PORT) || 8443;
+const HTTPS_LISTEN_PORT = process.env.HTTPS_LISTEN_PORT
+  ? parseInt(process.env.HTTPS_LISTEN_PORT)
+  : 8443;
 
 // Validate that at least one of the services is enabled. One or both can be set.
 if (!ENABLE_API && !ENABLE_SCHEDULER) {
@@ -53,10 +62,10 @@ app.get("/health", (_req, res) => {
 
 // Enable Trino Proxy and Trino client APIs
 if (ENABLE_API) {
-  app.use("/", require("./routes/cluster"));
-  app.use("/", require("./routes/query"));
-  app.use("/", require("./routes/trino"));
-  app.use("/", require("./routes/user"));
+  app.use("/", clusterRouter);
+  app.use("/", queryRouter);
+  app.use("/", trinoRouter);
+  app.use("/", userRouter);
 }
 
 // Fallback handler

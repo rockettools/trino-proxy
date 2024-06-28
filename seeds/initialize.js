@@ -1,5 +1,8 @@
 const uuidv4 = require("uuid").v4;
-const { CLUSTER_STATUS } = require("../src/lib/trino");
+const CLUSTER_STATUS = {
+  ENABLED: "ENABLED",
+  DISABLED: "DISABLED",
+};
 
 const now = new Date();
 

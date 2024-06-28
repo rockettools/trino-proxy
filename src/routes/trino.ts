@@ -1,30 +1,32 @@
-const _ = require("lodash");
-const express = require("express");
-const uuidv4 = require("uuid").v4;
-const axios = require("axios").default;
+import _ from "lodash";
+import express from "express";
+import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
-const {
+import {
   getAuthorizationHeader,
   getProxiedBody,
   createErrorResponseBody,
-} = require("../lib/helpers");
-const { knex } = require("../lib/knex");
-const logger = require("../lib/logger");
-const { traceCache } = require("../lib/memcache");
-const {
+} from "../lib/helpers";
+import { knex } from "../lib/knex";
+import logger from "../lib/logger";
+import { traceCache } from "../lib/memcache";
+import {
   getQueryById,
   getQueryHeaderInfo,
   parseFirstQueryHeader,
   QUERY_STATUS,
   updateQuery,
-} = require("../lib/query");
+} from "../lib/query";
+
+import type { Request } from "express";
 
 const router = express.Router();
 const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
 const MOCKED_QUERY_KEY_ID = "AWAITING_SCHEDULING";
 const MOCKED_QUERY_NUM = "0";
 
-function getHost(req) {
+function getHost(req: Request) {
   const host = req.get("host");
   const protocol = req.headers["x-forwarded-proto"]
     ? req.headers["x-forwarded-proto"] // TODO make sure this is only http or https
@@ -64,17 +66,24 @@ router.post("/v1/statement", async (req, res) => {
 
   try {
     const trinoTraceToken = req.headers["x-trino-trace-token"] || null;
-    if (trinoTraceToken) {
-      let info = await getQueryHeaderInfo(trinoTraceToken);
+    const traceId = Array.isArray(trinoTraceToken)
+      ? trinoTraceToken[0]
+      : trinoTraceToken;
+
+    if (traceId) {
+      let info = await getQueryHeaderInfo(traceId);
 
       // If this is the first query in the sequence it should have the header, try and parse.
       if (!info) {
         info = parseFirstQueryHeader(req.body, req.user.parsers);
         logger.debug("Parsed header info from query", info);
-        traceCache.set(trinoTraceToken, info);
+        traceCache.set(traceId, info);
       }
 
-      assumedUser = info.user;
+      if (info.user) {
+        assumedUser = info.user;
+      }
+
       if (Array.isArray(info.tags)) {
         info.tags.forEach((t) => clientTags.add(t));
       }
@@ -87,7 +96,7 @@ router.post("/v1/statement", async (req, res) => {
 
     // Add any tags passed through in the X-Trino-Client-Tags header, which some clients provide
     const headerTags = req.headers["x-trino-client-tags"];
-    if (headerTags) {
+    if (headerTags && typeof headerTags === "string") {
       const splitTags = headerTags.split(",");
       splitTags.forEach((t) => clientTags.add(t));
     }
@@ -151,17 +160,15 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
 
     if (query.status === QUERY_STATUS.NO_VALID_CLUSTERS) {
       logger.warn("No valid clusters", { state, queryId });
-      const response = await createErrorResponseBody(
+      const response = createErrorResponseBody(
         query.id,
         uuidv4(),
         TEMP_HOST,
         QUERY_STATUS.NO_VALID_CLUSTERS
       );
 
-      const returnHeaders = getTrinoHeaders(response.headers);
       const returnBody = getProxiedBody(response.data, queryId, getHost(req));
-
-      return res.status(200).set(returnHeaders).json(returnBody);
+      return res.status(200).json(returnBody);
     }
 
     // If the query is in the AWAITING_SCHEDULING state, then it hasn't been sent to a
@@ -205,7 +212,10 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .first();
 
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
-    req.headers.authorization = await getAuthorizationHeader(req.headers);
+    const authHeader = await getAuthorizationHeader(req.headers);
+    if (authHeader) {
+      req.headers.authorization = authHeader;
+    }
 
     try {
       // Passthrough this request to the Trino cluster
@@ -322,7 +332,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       const returnBody = getProxiedBody(response.data, queryId, getHost(req));
 
       return res.status(200).set(returnHeaders).json(returnBody);
-    } catch (err) {
+    } catch (err: any) {
       if (err.response && err.response.status === 404) {
         logger.error("Query not found on Trino cluster", {
           queryId,
@@ -366,13 +376,16 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .first();
 
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
-    req.headers.authorization = await getAuthorizationHeader(req.headers);
+    const authHeader = await getAuthorizationHeader(req.headers);
+    if (authHeader) {
+      req.headers.authorization = authHeader;
+    }
 
     try {
       // Passthrough this deletion request to the Trino cluster to actually cancel the query
       await axios({ url, method: "delete", headers: req.headers });
       logger.info("Cancelled query on Trino cluster", { queryId });
-    } catch (err) {
+    } catch (err: any) {
       // Anything other than a 404 error should be logged. If the query can't be found
       // then it's okay as we wanted to cancel it anyways.
       if (err.response && err.response.status !== 404) {
@@ -395,4 +408,4 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
