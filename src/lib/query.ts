@@ -1,9 +1,11 @@
-const { knex } = require("./knex");
-const { traceCache } = require("./memcache");
-const logger = require("./logger");
-const stats = require("./stats");
+import { knex } from "./knex";
+import { traceCache } from "./memcache";
+import logger from "./logger";
+import stats from "./stats";
 
-const QUERY_STATUS = {
+import type { Parsers, Query } from "../types/models";
+
+export const QUERY_STATUS = {
   // Trino Proxy states
   AWAITING_SCHEDULING: "AWAITING_SCHEDULING",
   CANCELLED: "CANCELLED",
@@ -20,20 +22,22 @@ const QUERY_STATUS = {
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
   STARTING: "STARTING",
-};
+} as const;
 
-async function getQueryById(newQueryId) {
+export async function getQueryById(newQueryId: string) {
   return knex("query").where({ id: newQueryId }).first();
 }
 
-async function getFirstQueryByTraceId(traceId) {
+export async function getFirstQueryByTraceId(traceId: string) {
   return knex("query")
     .where({ trace_id: traceId })
     .orderBy("created_at", "asc")
     .first();
 }
 
-async function getQueryHeaderInfo(traceId) {
+export async function getQueryHeaderInfo(
+  traceId: string | undefined
+): Promise<{ user: string | null; tags: string[] } | null> {
   if (!traceId) {
     return null;
   }
@@ -54,7 +58,7 @@ async function getQueryHeaderInfo(traceId) {
   return null;
 }
 
-async function updateQuery(queryId, data = {}) {
+export async function updateQuery(queryId: string, data: Partial<Query> = {}) {
   try {
     await knex("query").where({ id: queryId }).update(data);
   } catch (err) {
@@ -65,10 +69,10 @@ async function updateQuery(queryId, data = {}) {
   stats.increment("query_updated", [`status:${data.status}`]);
 }
 
-function parseFirstQueryHeader(query, parsers = {}) {
+export function parseFirstQueryHeader(query: string, parsers: Parsers = {}) {
   const parsedInfo = {
-    user: null,
-    tags: [],
+    user: null as string | null,
+    tags: [] as string[],
   };
 
   if (parsers?.user) {
@@ -88,11 +92,3 @@ function parseFirstQueryHeader(query, parsers = {}) {
 
   return parsedInfo;
 }
-
-module.exports = {
-  getQueryById,
-  getQueryHeaderInfo,
-  parseFirstQueryHeader,
-  QUERY_STATUS,
-  updateQuery,
-};

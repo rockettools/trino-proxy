@@ -1,6 +1,6 @@
-const express = require("express");
-const { knex } = require("../lib/knex");
-const logger = require("../lib/logger");
+import express from "express";
+import { knex } from "../lib/knex";
+import logger from "../lib/logger";
 
 const router = express.Router();
 
@@ -20,4 +20,4 @@ router.get("/v1/query/:id", async function (req, res) {
   }
 });
 
-module.exports = router;
+export default router;

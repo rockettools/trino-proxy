@@ -1,16 +1,23 @@
-const argon2 = require("argon2");
+import argon2 from "argon2";
 
-const { knex } = require("../lib/knex");
-const logger = require("../lib/logger");
+import { knex } from "../lib/knex";
+import logger from "../lib/logger";
 
-module.exports = async function (req, res, next) {
-  let username, password; // X-Trino-User
+import type { NextFunction, Request, Response } from "express";
 
-  if (req.headers["authorization"]) {
-    let header = req.headers["authorization"];
-    if (typeof header === "string") {
-      header = [header];
-    }
+export default async function (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  let username: string | null = null;
+  let password: string | null = null;
+
+  const authHeader = req.headers["authorization"];
+  const trinoUserHeader = req.headers["x-trino-user"];
+  if (authHeader) {
+    const header = typeof authHeader === "string" ? [authHeader] : authHeader;
+
     for (let idx = 0; idx < header.length; idx++) {
       if (header[idx].indexOf("Basic ") === 0) {
         const foundHeader = Buffer.from(header[idx].split(" ")[1], "base64")
@@ -25,8 +32,8 @@ module.exports = async function (req, res, next) {
         break;
       }
     }
-  } else if (req.headers["x-trino-user"]) {
-    username = req.headers["x-trino-user"];
+  } else if (trinoUserHeader && typeof trinoUserHeader === "string") {
+    username = trinoUserHeader;
     logger.silly("Found Trino User header", { username });
   }
 
@@ -44,7 +51,7 @@ module.exports = async function (req, res, next) {
         return res.status(401).json({ error: "Bad user/password" });
       }
 
-      if (user.password) {
+      if (user.password && password) {
         // check all passwords to allow for password rotation
         for (let idx = 0; idx < user.password.length; idx++) {
           if (await argon2.verify(user.password[idx], password)) {
@@ -67,4 +74,4 @@ module.exports = async function (req, res, next) {
   }
 
   next();
-};
+}

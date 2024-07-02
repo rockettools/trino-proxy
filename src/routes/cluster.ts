@@ -1,10 +1,10 @@
-const uuidv4 = require("uuid").v4;
-const zod = require("zod");
-const express = require("express");
+import { v4 as uuidv4 } from "uuid";
+import zod from "zod";
+import express from "express";
 
-const { CLUSTER_STATUS } = require("../lib/trino");
-const { knex } = require("../lib/knex");
-const logger = require("../lib/logger");
+import { CLUSTER_STATUS } from "../lib/trino";
+import { knex } from "../lib/knex";
+import logger from "../lib/logger";
 
 const router = express.Router();
 
@@ -96,4 +96,4 @@ router.patch("/v1/cluster/:clusterId", async function (req, res) {
   }
 });
 
-module.exports = router;
+export default router;

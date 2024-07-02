@@ -1,7 +1,14 @@
-const _ = require("lodash");
-const { getQueryHeaderInfo } = require("./query");
+import _ from "lodash";
+import { getQueryHeaderInfo, QUERY_STATUS } from "./query";
 
-function getProxiedBody(clusterBody, proxyId, proxyHost) {
+import type { IncomingHttpHeaders } from "http";
+import type { ClusterResponse } from "../types/trino";
+
+export function getProxiedBody(
+  clusterBody: ClusterResponse,
+  proxyId: string,
+  proxyHost: string
+) {
   const newBody = _.cloneDeep(clusterBody);
   // Save cluster's queryId for string replacement
   const clusterQueryId = newBody.id;
@@ -25,17 +32,26 @@ function getProxiedBody(clusterBody, proxyId, proxyHost) {
   return newBody;
 }
 
-async function getAuthorizationHeader(headers) {
-  const traceToken = headers["x-trino-trace-token"];
+export async function getAuthorizationHeader(headers: IncomingHttpHeaders) {
+  const traceTokenHeader = headers["x-trino-trace-token"];
+  const traceToken = Array.isArray(traceTokenHeader)
+    ? traceTokenHeader[0]
+    : traceTokenHeader;
+
   const headerUser = await getQueryHeaderInfo(traceToken);
-  const authorizationHeader = headerUser
-    ? "Basic " + Buffer.from(headerUser).toString("base64")
+  const authorizationHeader = headerUser?.user
+    ? "Basic " + Buffer.from(headerUser.user).toString("base64")
     : null;
 
   return authorizationHeader;
 }
 
-function createErrorResponseBody(queryId, uuid, tempHost, queryStatus) {
+export function createErrorResponseBody(
+  queryId: string,
+  uuid: string,
+  tempHost: string,
+  queryStatus: keyof typeof QUERY_STATUS
+) {
   return {
     data: {
       id: uuid,
@@ -74,9 +90,3 @@ function createErrorResponseBody(queryId, uuid, tempHost, queryStatus) {
     },
   };
 }
-
-module.exports = {
-  getAuthorizationHeader,
-  getProxiedBody,
-  createErrorResponseBody,
-};

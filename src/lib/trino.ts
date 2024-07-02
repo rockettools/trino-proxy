@@ -1,27 +1,33 @@
-const axios = require("axios").default;
-const bluebird = require("bluebird");
+import axios from "axios";
+import bluebird from "bluebird";
+import { v4 as uuidv4 } from "uuid";
 
-const { knex } = require("../lib/knex");
-const logger = require("../lib/logger");
-const stats = require("../lib/stats");
-const { QUERY_STATUS } = require("../lib/query");
-const { createErrorResponseBody } = require("../lib/helpers");
-const uuidv4 = require("uuid").v4;
+import { knex } from "../lib/knex";
+import logger from "../lib/logger";
+import stats from "../lib/stats";
+import { QUERY_STATUS } from "../lib/query";
+import { createErrorResponseBody } from "../lib/helpers";
+import { userCache } from "../lib/memcache";
+
+import type { Cluster, Query } from "../types/models";
+import type { ClusterStats } from "../types/trino";
+
 const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
-const { userCache } = require("../lib/memcache");
 
 const ROUTING_METHOD = process.env.ROUTING_METHOD || "ROUND_ROBIN";
 const DEFAULT_CLUSTER_TAG = process.env.DEFAULT_CLUSTER_TAG
   ? [process.env.DEFAULT_CLUSTER_TAG]
   : [];
 
-const CLUSTER_STATUS = {
+export const CLUSTER_STATUS = {
   ENABLED: "ENABLED",
   DISABLED: "DISABLED",
 };
 
 let schedulerRunning = false;
-const SCHEDULER_DELAY_MS = parseInt(process.env.SCHEDULER_DELAY_MS) || 1000 * 5;
+const SCHEDULER_DELAY_MS = process.env.SCHEDULER_DELAY_MS
+  ? parseInt(process.env.SCHEDULER_DELAY_MS)
+  : 1000 * 5;
 const MAX_QUERIES_QUEUED = 10;
 
 const clusterHeaderRegex = new RegExp("-- Cluster: *(.*)");
@@ -34,7 +40,7 @@ const clusterHeaderRegex = new RegExp("-- Cluster: *(.*)");
  * TODO: improve this to cache the server status or prefetch it to minimize time between
  * trino-proxy accepting a new query and it being passed off to a Trino cluster.
  */
-async function isClusterHealthy(clusterBaseUrl) {
+async function isClusterHealthy(clusterBaseUrl?: string) {
   if (!clusterBaseUrl) {
     throw new Error("Missing clusterBaseUrl");
   }
@@ -83,7 +89,7 @@ async function getAvailableClusters() {
 
 async function scheduleQueries() {
   if (schedulerRunning) return;
-  const startTime = new Date();
+  const startTime = Date.now();
 
   try {
     const queriesToSchedule = await knex("query")
@@ -92,7 +98,7 @@ async function scheduleQueries() {
 
     // Increment number of pending queries for monitoring
     // If there are none, just early exit to prevent the extra db calls
-    const numberQueriesPending = parseInt(queriesToSchedule[0].count) || 0;
+    const numberQueriesPending = Number(queriesToSchedule[0].count) || 0;
     stats.gauge("queries_waiting_scheduling", numberQueriesPending);
     if (numberQueriesPending === 0) return;
 
@@ -202,7 +208,6 @@ async function scheduleQueries() {
               `cluster:${cluster.name}`,
               `user:${user}`,
               `source:${source}`,
-              ...clientTags,
             ]);
           }
         });
@@ -213,12 +218,16 @@ async function scheduleQueries() {
   } catch (err) {
     logger.error("Error scheduling queries", err);
   } finally {
-    stats.timing("scheduler.timing", new Date() - startTime);
+    stats.timing("scheduler.timing", Date.now() - startTime);
     schedulerRunning = false;
   }
 }
 
-async function getCluster(availableClusters, currentClusterId, query) {
+async function getCluster(
+  availableClusters: Cluster[],
+  currentClusterId: number,
+  query: Query
+) {
   // Get user's cluster tags and default to DEFAULT_CLUSTER_TAG if no tags provided
   let queryUser = userCache.get(query.user);
   if (!queryUser) {
@@ -226,23 +235,23 @@ async function getCluster(availableClusters, currentClusterId, query) {
     userCache.set(query.user, queryUser);
   }
 
-  const userClusterTags = queryUser.options?.clusterTags || DEFAULT_CLUSTER_TAG;
+  const userClusterTags =
+    queryUser?.options?.clusterTags || DEFAULT_CLUSTER_TAG;
 
-  if (ROUTING_METHOD === "ROUND_ROBIN")
+  if (ROUTING_METHOD === "ROUND_ROBIN") {
     return availableClusters[currentClusterId];
+  }
 
   if (ROUTING_METHOD === "LOAD") {
     logger.debug("Load based routing");
 
     // look to see if the user has passed a header in the query to target a cluster
-    const queryHasClusterHeader = clusterHeaderRegex.exec(query.body) !== null;
+    const queryClusterTags = clusterHeaderRegex.exec(query.body);
 
-    let validClusters = [];
+    const validClusters: Array<Cluster & ClusterStats> = [];
 
     for (const cluster of availableClusters) {
-      if (queryHasClusterHeader) {
-        const queryClusterTags = clusterHeaderRegex.exec(query.body);
-
+      if (queryClusterTags) {
         if (
           queryClusterTags.filter((x) => cluster.tags.includes(x)).length == 0
         )
@@ -253,31 +262,29 @@ async function getCluster(availableClusters, currentClusterId, query) {
           continue;
       }
 
-      const statsResponse = await axios({
+      const statsResponse = await axios<ClusterStats>({
         url: `${cluster.url}/ui/api/stats`,
         method: "get",
       });
 
-      cluster.runningQueries = statsResponse.data.runningQueries;
-      cluster.queuedQueries = statsResponse.data.queuedQueries;
-      cluster.blockedQueries = statsResponse.data.blockedQueries;
-
-      validClusters.push(cluster);
+      validClusters.push({
+        ...cluster,
+        runningQueries: statsResponse.data.runningQueries,
+        queuedQueries: statsResponse.data.queuedQueries,
+        blockedQueries: statsResponse.data.blockedQueries,
+      });
     }
 
     logger.debug("sorting clusters based on load");
-
     const sortedClusters = validClusters.sort(compareByLoad);
 
-    logger.debug("sorted clusters: " + JSON.stringify(sortedClusters));
-
+    logger.debug("Sorted clusters", sortedClusters);
     const cluster = sortedClusters[0];
-
     return cluster;
   }
 }
 
-function compareByLoad(a, b) {
+function compareByLoad(a: ClusterStats, b: ClusterStats) {
   return (
     a.runningQueries - b.runningQueries ||
     a.queuedQueries - b.queuedQueries ||
@@ -290,14 +297,9 @@ async function runSchedulerAndReschedule() {
   setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 }
 
-async function startScheduler() {
+export async function startScheduler() {
   logger.info(
     `Scheduling query scheduler to run every ${SCHEDULER_DELAY_MS}ms`
   );
   setTimeout(runSchedulerAndReschedule, SCHEDULER_DELAY_MS);
 }
-
-module.exports = {
-  startScheduler,
-  CLUSTER_STATUS,
-};
