@@ -248,7 +248,7 @@ async function getCluster(
     // look to see if the user has passed a header in the query to target a cluster
     const queryClusterTags = clusterHeaderRegex.exec(query.body);
 
-    let validClusters: Array<Cluster & ClusterStats> = [];
+    const validClusters: Array<Cluster & ClusterStats> = [];
 
     for (const cluster of availableClusters) {
       if (queryClusterTags) {

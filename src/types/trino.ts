@@ -3,3 +3,14 @@ export type ClusterStats = {
   queuedQueries: number;
   blockedQueries: number;
 };
+
+export type ClusterResponse = {
+  id: string;
+  infoUri: string;
+  nextUri?: string;
+  stats: {
+    state: string;
+  };
+  error?: object;
+  warnings?: object[];
+};

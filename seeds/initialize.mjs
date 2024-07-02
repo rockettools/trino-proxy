@@ -1,4 +1,4 @@
-const uuidv4 = require("uuid").v4;
+import { v4 as uuidv4 } from "uuid";
 const CLUSTER_STATUS = {
   ENABLED: "ENABLED",
   DISABLED: "DISABLED",
@@ -10,7 +10,7 @@ const now = new Date();
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.seed = async function (knex) {
+export async function seed(knex) {
   await knex("user").del();
   await knex("user").insert({
     id: uuidv4(),
@@ -101,4 +101,4 @@ exports.seed = async function (knex) {
     updated_at: now,
     created_at: now,
   });
-};
+}

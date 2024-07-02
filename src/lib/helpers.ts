@@ -2,9 +2,10 @@ import _ from "lodash";
 import { getQueryHeaderInfo, QUERY_STATUS } from "./query";
 
 import type { IncomingHttpHeaders } from "http";
+import type { ClusterResponse } from "../types/trino";
 
 export function getProxiedBody(
-  clusterBody: any,
+  clusterBody: ClusterResponse,
   proxyId: string,
   proxyHost: string
 ) {

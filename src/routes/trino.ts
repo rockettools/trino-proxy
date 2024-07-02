@@ -332,7 +332,8 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       const returnBody = getProxiedBody(response.data, queryId, getHost(req));
 
       return res.status(200).set(returnHeaders).json(returnBody);
-    } catch (err: any) {
+    } catch (err) {
+      // @ts-expect-error any type
       if (err.response && err.response.status === 404) {
         logger.error("Query not found on Trino cluster", {
           queryId,
@@ -385,9 +386,10 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       // Passthrough this deletion request to the Trino cluster to actually cancel the query
       await axios({ url, method: "delete", headers: req.headers });
       logger.info("Cancelled query on Trino cluster", { queryId });
-    } catch (err: any) {
+    } catch (err) {
       // Anything other than a 404 error should be logged. If the query can't be found
       // then it's okay as we wanted to cancel it anyways.
+      // @ts-expect-error any type
       if (err.response && err.response.status !== 404) {
         logger.error("Query not found on Trino cluster", {
           queryId,
