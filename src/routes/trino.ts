@@ -8,11 +8,7 @@ import {
   TRINO_MOCKED_QUERY_KEY_ID,
   TRINO_MOCKED_QUERY_NUM,
 } from "../lib/constants";
-import {
-  getAuthorizationHeader,
-  getProxiedBody,
-  createErrorResponseBody,
-} from "../lib/helpers";
+import { getProxiedBody, createErrorResponseBody } from "../lib/helpers";
 import { knex } from "../lib/knex";
 import logger from "../lib/logger";
 import { traceCache } from "../lib/memcache";
@@ -214,10 +210,6 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .first();
 
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
-    const authHeader = await getAuthorizationHeader(req.headers);
-    if (authHeader) {
-      req.headers.authorization = authHeader;
-    }
 
     try {
       // Passthrough this request to the Trino cluster
@@ -379,10 +371,6 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .first();
 
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
-    const authHeader = await getAuthorizationHeader(req.headers);
-    if (authHeader) {
-      req.headers.authorization = authHeader;
-    }
 
     try {
       // Passthrough this deletion request to the Trino cluster to actually cancel the query
