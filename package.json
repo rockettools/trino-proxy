@@ -6,6 +6,8 @@
   "private": true,
   "license": "ISC",
   "scripts": {
+    "build": "tsc",
+    "start": "yarn build && node dist/server.js",
     "format": "prettier --write .",
     "lint": "eslint --fix .",
     "check:format": "prettier --check .",
@@ -29,13 +31,21 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@tsconfig/node18": "^18.2.4",
+    "@types/bluebird": "^3.5.42",
+    "@types/express": "^4.17.21",
+    "@types/lodash": "^4.17.0",
     "@types/node": "^18.11.12",
+    "@types/uuid": "^9.0.8",
+    "@typescript-eslint/eslint-plugin": "^7.7.1",
+    "@typescript-eslint/parser": "^7.7.1",
     "eslint": "^8.53.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.1",
     "husky": "^8.0.3",
     "lint-staged": "^15.0.2",
-    "prettier": "^3.0.3"
+    "prettier": "^3.0.3",
+    "typescript": "^5.4.5"
   },
   "lint-staged": {
     "**/*.js": [

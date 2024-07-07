@@ -1,13 +1,15 @@
-const express = require("express");
-const argon2 = require("argon2");
-const uuidv4 = require("uuid").v4;
+import express from "express";
+import argon2 from "argon2";
+import { v4 as uuidv4 } from "uuid";
 
-const { knex } = require("../lib/knex");
-const logger = require("../lib/logger");
+import { knex } from "../lib/knex";
+import logger from "../lib/logger";
+
+import type { Request, Response } from "express";
 
 const router = express.Router();
 
-async function getHashedPasswords(password) {
+async function getHashedPasswords(password?: string) {
   if (!password) return [];
 
   // Password input can be a single value, or a list of values
@@ -21,7 +23,7 @@ async function getHashedPasswords(password) {
   return hashedPasswords;
 }
 
-router.get("/v1/user", async function (req, res) {
+router.get("/v1/user", async function (req: Request, res: Response) {
   try {
     const data = await knex("user");
     const users = data.map((user) => ({
@@ -38,7 +40,7 @@ router.get("/v1/user", async function (req, res) {
   }
 });
 
-router.get("/v1/user/me", async function (req, res) {
+router.get("/v1/user/me", async function (req: Request, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -46,7 +48,7 @@ router.get("/v1/user/me", async function (req, res) {
   return res.status(200).json(req.user);
 });
 
-router.post("/v1/user", async function (req, res) {
+router.post("/v1/user", async function (req: Request, res: Response) {
   const { username, password, parsers = null, tags = [] } = req.body;
 
   try {
@@ -54,7 +56,7 @@ router.post("/v1/user", async function (req, res) {
     if (!req.user) {
       // unless this is the first user, we should block this
       const c = await knex("user").count("*");
-      if (c[0].count > 0) {
+      if (Number(c[0].count) > 0) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
@@ -88,7 +90,7 @@ router.post("/v1/user", async function (req, res) {
   }
 });
 
-router.patch("/v1/user/:userId", async function (req, res) {
+router.patch("/v1/user/:userId", async function (req: Request, res: Response) {
   // Only admin users can adjust tags
   // Otherwise, all users can make themselves an admin
   if (!req.user || !req.user.tags.includes("admin")) {
@@ -119,4 +121,4 @@ router.patch("/v1/user/:userId", async function (req, res) {
   }
 });
 
-module.exports = router;
+export default router;

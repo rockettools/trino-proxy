@@ -1,4 +1,5 @@
-const { LRUCache } = require("lru-cache");
+import { LRUCache } from "lru-cache";
+import { QueryUser, Trace } from "../types/models";
 
 /**
  * This cache stores mappings of `x-trino-trace-token` headers
@@ -9,7 +10,7 @@ const { LRUCache } = require("lru-cache");
  * There is no TTL on this cache as some queries are long-running
  * and we need to keep the mapping around for a while.
  */
-const traceCache = new LRUCache({
+export const traceCache = new LRUCache<string, Trace>({
   max: process.env.TRACE_CACHE_SIZE
     ? parseInt(process.env.TRACE_CACHE_SIZE)
     : 1000,
@@ -23,7 +24,7 @@ const traceCache = new LRUCache({
  * There is a short TTL on this cache to ensure that updates to the
  * user's cluster tags are fetched quickly by the service.
  */
-const userCache = new LRUCache({
+export const userCache = new LRUCache<string, QueryUser>({
   max: process.env.USER_CACHE_SIZE
     ? parseInt(process.env.USER_CACHE_SIZE)
     : 1000,
@@ -31,8 +32,3 @@ const userCache = new LRUCache({
     ? parseInt(process.env.USER_CACHE_TTL_MS)
     : 1000 * 60 * 3, // 3min
 });
-
-module.exports = {
-  traceCache,
-  userCache,
-};
