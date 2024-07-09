@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+const uuidv4 = require("uuid").v4;
 const CLUSTER_STATUS = {
   ENABLED: "ENABLED",
   DISABLED: "DISABLED",
@@ -10,7 +10,8 @@ const now = new Date();
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-export async function seed(knex) {
+exports.seed = async function seed(knex) {
+  // Clear out any existing users and re-insert test users
   await knex("user").del();
   await knex("user").insert({
     id: uuidv4(),
@@ -39,7 +40,7 @@ export async function seed(knex) {
     created_at: now,
   });
 
-  // User with email cluster targeted in options
+  // User with green cluster targeted in options
   await knex("user").insert({
     id: uuidv4(),
     name: "green",
@@ -73,6 +74,7 @@ export async function seed(knex) {
     created_at: now,
   });
 
+  // Clear out any existing clusters and re-insert test clusters
   await knex("cluster").del();
   await knex("cluster").insert({
     id: uuidv4(),
@@ -101,4 +103,7 @@ export async function seed(knex) {
     updated_at: now,
     created_at: now,
   });
-}
+
+  // Clear out any existing queries
+  await knex("query").del();
+};

@@ -20,9 +20,12 @@ import {
   updateQuery,
 } from "../lib/query";
 
-import type { Request } from "express";
+import type { Request, Response } from "express";
+import type { ClusterInfo } from "../types/trino";
 
 const router = express.Router();
+const startTime = Date.now();
+const ENV = process.env.NODE_ENV || "production";
 
 function getHost(req: Request) {
   const host = req.get("host");
@@ -38,12 +41,14 @@ function getTrinoHeaders(headers = {}) {
 }
 
 // Mock info endpoint to abstract out the cluster information
-router.get("/v1/info", async (req, res) => {
+router.get("/v1/info", async (req: Request, res: Response<ClusterInfo>) => {
+  const uptimeMs = Date.now() - startTime;
   return res.status(200).json({
     nodeVersion: { version: "trino-proxy" },
-    environment: "docker",
+    environment: ENV,
     coordinator: true,
     starting: false,
+    uptime: `${uptimeMs}ms`,
   });
 });
 

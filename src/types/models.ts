@@ -1,3 +1,5 @@
+import { QUERY_STATUS } from "../lib/query";
+
 export type Parsers = {
   [key: string]: string;
 };
@@ -23,7 +25,7 @@ export type QueryUser = {
 
 export type Query = {
   id: string;
-  status: string; //todo
+  status: keyof typeof QUERY_STATUS;
   body: string;
   cluster_id: string | null;
   cluster_query_id: string | null;

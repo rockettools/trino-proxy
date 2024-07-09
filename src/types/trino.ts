@@ -1,3 +1,13 @@
+export type ClusterInfo = {
+  nodeVersion: {
+    version: string;
+  };
+  environment: string;
+  coordinator: boolean;
+  starting: boolean;
+  uptime: string;
+};
+
 export type ClusterStats = {
   runningQueries: number;
   queuedQueries: number;

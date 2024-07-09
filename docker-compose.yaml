@@ -13,14 +13,12 @@ services:
     ports:
       - 8080:8080
     depends_on:
-      - postgres
-      - trino1
-      - trino2
-      - trino3
+      postgres:
+        condition: service_healthy
     environment:
       - DB_URL=postgres://trino_proxy:trino_proxy@postgres/trino_proxy
       - HTTP_ENABLED=true
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=warn
       - NODE_ENV=production
       - ENABLE_API=true
 
@@ -33,10 +31,14 @@ services:
     ports:
       - 8081:8080
     depends_on:
-      - postgres
-      - trino1
-      - trino2
-      - trino3
+      postgres:
+        condition: service_healthy
+      trino1:
+        condition: service_healthy
+      trino2:
+        condition: service_healthy
+      trino3:
+        condition: service_healthy
     environment:
       - DB_URL=postgres://trino_proxy:trino_proxy@postgres/trino_proxy
       - HTTP_ENABLED=true
@@ -55,15 +57,26 @@ services:
       POSTGRES_USER: trino_proxy
       POSTGRES_PASSWORD: trino_proxy
       POSTGRES_DB: trino_proxy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "trino_proxy"]
+      interval: 5s
+      timeout: 1s
+      retries: 3
 
   trino1:
     image: trinodb/trino
     container_name: trino1
     restart: always
+    healthcheck:
+      test: curl --fail http://trino3:8080/ui/api/stats
+      interval: 5s
+      timeout: 1s
+      retries: 3
     volumes:
       - ./seeds/trino_config:/etc/trino
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - 8091:8080
 
@@ -71,10 +84,16 @@ services:
     image: trinodb/trino
     container_name: trino2
     restart: always
+    healthcheck:
+      test: curl --fail http://trino3:8080/ui/api/stats
+      interval: 5s
+      timeout: 1s
+      retries: 3
     volumes:
       - ./seeds/trino_config:/etc/trino
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - 8092:8080
 
@@ -82,9 +101,15 @@ services:
     image: trinodb/trino
     container_name: trino3
     restart: always
+    healthcheck:
+      test: curl --fail http://trino3:8080/ui/api/stats
+      interval: 5s
+      timeout: 1s
+      retries: 3
     volumes:
       - ./seeds/trino_config:/etc/trino
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - 8093:8080
