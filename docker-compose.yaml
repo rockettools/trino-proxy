@@ -67,11 +67,6 @@ services:
     image: trinodb/trino
     container_name: trino1
     restart: always
-    healthcheck:
-      test: curl --fail http://trino3:8080/ui/api/stats
-      interval: 5s
-      timeout: 1s
-      retries: 3
     volumes:
       - ./seeds/trino_config:/etc/trino
     depends_on:
@@ -84,11 +79,6 @@ services:
     image: trinodb/trino
     container_name: trino2
     restart: always
-    healthcheck:
-      test: curl --fail http://trino3:8080/ui/api/stats
-      interval: 5s
-      timeout: 1s
-      retries: 3
     volumes:
       - ./seeds/trino_config:/etc/trino
     depends_on:
@@ -101,11 +91,6 @@ services:
     image: trinodb/trino
     container_name: trino3
     restart: always
-    healthcheck:
-      test: curl --fail http://trino3:8080/ui/api/stats
-      interval: 5s
-      timeout: 1s
-      retries: 3
     volumes:
       - ./seeds/trino_config:/etc/trino
     depends_on:

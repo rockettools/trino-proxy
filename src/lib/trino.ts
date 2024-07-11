@@ -28,6 +28,7 @@ const DEFAULT_CLUSTER_TAG = process.env.DEFAULT_CLUSTER_TAG
   : [];
 
 let schedulerRunning = false;
+let consecutiveFailures = 0;
 const clusterHeaderRegex = new RegExp("-- Cluster: *(.*)");
 
 /**
@@ -60,6 +61,7 @@ async function getClusterStats(
       method: "get",
     });
 
+    // TODO: check if queue is too long
     isHealthy = true;
     return {
       ...cluster,
@@ -220,6 +222,7 @@ async function scheduleQueries(): Promise<void> {
     const availableClusters = await getAvailableClusters();
     if (availableClusters.length === 0) {
       logger.error("No healthy clusters available");
+      consecutiveFailures++;
       return;
     }
 
@@ -277,11 +280,15 @@ async function scheduleQueries(): Promise<void> {
               });
             return;
           }
+
+          // There are no clusters available, give them time to initialize
+          consecutiveFailures++;
           return;
         }
 
         // If we've made it this far, we can schedule the query
-        return await scheduleSingleQuery(query, cluster, trx);
+        const querySucessful = await scheduleSingleQuery(query, cluster, trx);
+        consecutiveFailures = querySucessful ? 0 : consecutiveFailures++;
       });
     } catch (scheduleErr) {
       // Trino errors are caught in `scheduleSingleQuery`, so
@@ -355,7 +362,9 @@ function compareByLoad(a: ClusterStats, b: ClusterStats) {
 
 async function runSchedulerAndReschedule() {
   await scheduleQueries();
-  setImmediate(runSchedulerAndReschedule);
+
+  const scheduleMs = Math.min(consecutiveFailures * 1000, 10000);
+  setTimeout(runSchedulerAndReschedule, scheduleMs);
 }
 
 export async function startScheduler() {
