@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import zod from "zod";
 import express from "express";
 
-import { CLUSTER_STATUS } from "../lib/trino";
+import { CLUSTER_STATUS } from "../lib/constants";
 import { knex } from "../lib/knex";
 import logger from "../lib/logger";
 

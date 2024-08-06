@@ -1,7 +1,6 @@
 import _ from "lodash";
-import { getQueryHeaderInfo, QUERY_STATUS } from "./query";
+import { QUERY_STATUS } from "./query";
 
-import type { IncomingHttpHeaders } from "http";
 import type { ClusterResponse } from "../types/trino";
 
 export function getProxiedBody(
@@ -30,20 +29,6 @@ export function getProxiedBody(
   }
 
   return newBody;
-}
-
-export async function getAuthorizationHeader(headers: IncomingHttpHeaders) {
-  const traceTokenHeader = headers["x-trino-trace-token"];
-  const traceToken = Array.isArray(traceTokenHeader)
-    ? traceTokenHeader[0]
-    : traceTokenHeader;
-
-  const headerUser = await getQueryHeaderInfo(traceToken);
-  const authorizationHeader = headerUser?.user
-    ? "Basic " + Buffer.from(headerUser.user).toString("base64")
-    : null;
-
-  return authorizationHeader;
 }
 
 export function createErrorResponseBody(

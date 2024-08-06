@@ -4,10 +4,11 @@ import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
 
 import {
-  getAuthorizationHeader,
-  getProxiedBody,
-  createErrorResponseBody,
-} from "../lib/helpers";
+  TRINO_TEMP_HOST,
+  TRINO_MOCKED_QUERY_KEY_ID,
+  TRINO_MOCKED_QUERY_NUM,
+} from "../lib/constants";
+import { getProxiedBody, createErrorResponseBody } from "../lib/helpers";
 import { knex } from "../lib/knex";
 import logger from "../lib/logger";
 import { traceCache } from "../lib/memcache";
@@ -19,12 +20,12 @@ import {
   updateQuery,
 } from "../lib/query";
 
-import type { Request } from "express";
+import type { Request, Response } from "express";
+import type { ClusterInfo } from "../types/trino";
 
 const router = express.Router();
-const TEMP_HOST = "http://localhost:5110"; // temp host later override to external host
-const MOCKED_QUERY_KEY_ID = "AWAITING_SCHEDULING";
-const MOCKED_QUERY_NUM = "0";
+const startTime = Date.now();
+const ENV = process.env.NODE_ENV || "production";
 
 function getHost(req: Request) {
   const host = req.get("host");
@@ -40,12 +41,14 @@ function getTrinoHeaders(headers = {}) {
 }
 
 // Mock info endpoint to abstract out the cluster information
-router.get("/v1/info", async (req, res) => {
+router.get("/v1/info", async (req: Request, res: Response<ClusterInfo>) => {
+  const uptimeMs = Date.now() - startTime;
   return res.status(200).json({
     nodeVersion: { version: "trino-proxy" },
-    environment: "docker",
+    environment: ENV,
     coordinator: true,
     starting: false,
+    uptime: `${uptimeMs}ms`,
   });
 });
 
@@ -125,8 +128,8 @@ router.post("/v1/statement", async (req, res) => {
     const returnBody = getProxiedBody(
       {
         id: newQueryId,
-        infoUri: `${TEMP_HOST}/ui/query.html?${newQueryId}`,
-        nextUri: `${TEMP_HOST}/v1/statement/queued/${newQueryId}/${MOCKED_QUERY_KEY_ID}/${MOCKED_QUERY_NUM}`,
+        infoUri: `${TRINO_TEMP_HOST}/ui/query.html?${newQueryId}`,
+        nextUri: `${TRINO_TEMP_HOST}/v1/statement/queued/${newQueryId}/${TRINO_MOCKED_QUERY_KEY_ID}/${TRINO_MOCKED_QUERY_NUM}`,
         stats: {
           state: QUERY_STATUS.QUEUED,
         },
@@ -163,7 +166,7 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       const response = createErrorResponseBody(
         query.id,
         uuidv4(),
-        TEMP_HOST,
+        TRINO_TEMP_HOST,
         QUERY_STATUS.NO_VALID_CLUSTERS
       );
 
@@ -177,8 +180,8 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       const returnBody = getProxiedBody(
         {
           id: query.id,
-          infoUri: `${TEMP_HOST}/ui/query.html?${query.id}`,
-          nextUri: `${TEMP_HOST}/v1/statement/queued/${query.id}/${MOCKED_QUERY_KEY_ID}/${MOCKED_QUERY_NUM}`,
+          infoUri: `${TRINO_TEMP_HOST}/ui/query.html?${query.id}`,
+          nextUri: `${TRINO_TEMP_HOST}/v1/statement/queued/${query.id}/${TRINO_MOCKED_QUERY_KEY_ID}/${TRINO_MOCKED_QUERY_NUM}`,
           stats: {
             state: QUERY_STATUS.QUEUED,
           },
@@ -191,11 +194,11 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
 
     // If we received the mocked keyId/num pair back and we're no longer in AWAITING_SCHEDULING,
     // we can use the NEXT_URI from the Trino cluster to create a valid URL
-    if (keyId === MOCKED_QUERY_KEY_ID && num === MOCKED_QUERY_NUM) {
+    if (keyId === TRINO_MOCKED_QUERY_KEY_ID && num === TRINO_MOCKED_QUERY_NUM) {
       const returnBody = getProxiedBody(
         {
           id: query.cluster_query_id,
-          infoUri: `${TEMP_HOST}/ui/query.html?${query.id}`,
+          infoUri: `${TRINO_TEMP_HOST}/ui/query.html?${query.id}`,
           nextUri: query.next_uri,
           stats: {
             state: query.status,
@@ -212,10 +215,6 @@ router.get("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .first();
 
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
-    const authHeader = await getAuthorizationHeader(req.headers);
-    if (authHeader) {
-      req.headers.authorization = authHeader;
-    }
 
     try {
       // Passthrough this request to the Trino cluster
@@ -377,10 +376,6 @@ router.delete("/v1/statement/:state/:queryId/:keyId/:num", async (req, res) => {
       .first();
 
     const url = `${cluster.url}/v1/statement/${state}/${query.cluster_query_id}/${keyId}/${num}`;
-    const authHeader = await getAuthorizationHeader(req.headers);
-    if (authHeader) {
-      req.headers.authorization = authHeader;
-    }
 
     try {
       // Passthrough this deletion request to the Trino cluster to actually cancel the query
