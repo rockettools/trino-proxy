@@ -21,6 +21,12 @@ import type { ClusterInfo, ClusterStats } from "../types/trino";
 
 type ClusterWithStats = Cluster & ClusterStats;
 
+const SCHEDULER_MIN_DELAY_MS = parseInt(
+  process.env.SCHEDULER_MIN_DELAY_MS || "1000"
+);
+const SCHEDULER_MAX_DELAY_MS = parseInt(
+  process.env.SCHEDULER_MAX_DELAY_MS || "10000"
+);
 const ROUTING_METHOD =
   process.env.ROUTING_METHOD || ROUTING_METHODS.ROUND_ROBIN;
 const DEFAULT_CLUSTER_TAG = process.env.DEFAULT_CLUSTER_TAG
@@ -349,7 +355,7 @@ async function chooseCluster(
     return cluster;
   }
 
-  return undefined;
+  throw Error(`Unrecognized routing method: ${ROUTING_METHOD}`);
 }
 
 function compareByLoad(a: ClusterStats, b: ClusterStats) {
@@ -363,7 +369,11 @@ function compareByLoad(a: ClusterStats, b: ClusterStats) {
 async function runSchedulerAndReschedule() {
   await scheduleQueries();
 
-  const scheduleMs = Math.min(consecutiveFailures * 1000, 10000);
+  const scheduleMs = _.clamp(
+    consecutiveFailures * 1000,
+    SCHEDULER_MIN_DELAY_MS,
+    SCHEDULER_MAX_DELAY_MS
+  );
   setTimeout(runSchedulerAndReschedule, scheduleMs);
 }
 
