@@ -330,13 +330,23 @@ async function chooseCluster(
 
     // Clusters with tags are reserved for queries/users that target them
     if (clusterTags.length) {
+      // If either the query or the user has tags, they must match with those of
+      // the cluster; an absence of tags on the query or on the user may match
+      // with any cluster, even if the cluster has tags.
+
       // Skip if query-specified tags and there's no overlap with cluster
-      if (!_.intersection(queryClusterTags, clusterTags).length) {
+      if (
+        queryClusterTags.length > 0 &&
+        !_.intersection(queryClusterTags, clusterTags).length
+      ) {
         return false;
       }
 
       // Skip if user-specified tags and there's no overlap with cluster
-      if (!_.intersection(userClusterTags, clusterTags).length) {
+      if (
+        userClusterTags.length > 0 &&
+        !_.intersection(userClusterTags, clusterTags).length
+      ) {
         return false;
       }
     }
